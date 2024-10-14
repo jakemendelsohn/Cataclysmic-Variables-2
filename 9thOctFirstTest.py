@@ -14,6 +14,7 @@ import scipy
 
 
 def lightcurve_plot(time, flux):
+    plt.figure(figsize=(14, 6)) 
     plt.scatter(time, flux, s=1)  # s=1 reduces the point size for performance
     plt.xlabel('Time')
     plt.ylabel('Flux')
@@ -36,17 +37,18 @@ def Lomb_Scargle(time,flux,file_name):
     # Specify the desired frequency range
     min_freq, max_freq = frequency_range(time,flux,file_name)
     # Compute the Lomb-Scargle Periodogram within the specified frequency range
-    num_frequency_points = 1000000  # You can adjust this based on the desired resolution
+    num_frequency_points = 100000  # You can adjust this based on the desired resolution
     frequency = np.linspace(min_freq, max_freq, num_frequency_points)
     ls = LombScargle(time, flux)
-    power = ls.power(frequency)  # Manually compute power without autopower
+    power = ls.power(frequency)# Manually compute power without autopower
     # Plot the Lomb-Scargle Periodogram
     plt.figure(figsize=(10, 6))
     plt.plot(frequency, power*frequency, 'k', lw=1)
     
     # Set logarithmic scale for frequency and power if needed
     plt.xscale('log')
-    plt.yscale('log')
+    #plt.yscale('log')
+    plt.yscale('linear')
     
     # Set axis labels
     plt.xlabel('Frequency (c/d)')
@@ -62,13 +64,26 @@ def Lomb_Scargle(time,flux,file_name):
     plt.show()
     return frequency,power   
 
-def peak_finder(frequency, power):
-    peak_idx = np.argmax(power*frequency)  # Index of the peak power
-    peak_frequency = frequency[peak_idx]  # Frequency corresponding to the peak
-    peak_period = 1 / peak_frequency
-    print("The peak period is", peak_period*60*24, "minutes.")
-    print("The peak frequency is", peak_frequency, "c/d.")
-    return peak_frequency, peak_period
+def peak_finder(frequency, power,  height_threshold=0.007, prominence=0.0001):
+    y = frequency*power
+    peaks, properties = find_peaks(y, height=height_threshold, prominence=prominence)
+    
+    # Extract the frequencies and powers of the found peaks
+    peak_frequencies = frequency[peaks]
+    peak_powers = y[peaks]
+    
+    # Print the results
+    print("Found peaks at the following frequencies (c/d) and their corresponding powers:")
+    for i in range(len(peaks)):
+        print(f"Peak {i + 1}: Frequency = {peak_frequencies[i]:.6f} c/d, Power = {peak_powers[i]:.6e}")
+    
+    return peak_frequencies, peak_powers
+    #peak_idx = np.argmax(power*frequency)  # Index of the peak power
+    #peak_frequency = frequency[peak_idx]  # Frequency corresponding to the peak
+    #peak_period = 1 / peak_frequency
+    #print("The peak period is", peak_period*60*24, "minutes.")
+    #print("The peak frequency is", peak_frequency, "c/d.")
+    #return peak_frequency, peak_period
 
 def fold_data(time, flux, period):
     # Fold the time data by calculating the phase (time modulo period)
@@ -103,7 +118,7 @@ def plot_folded_data(bin_centers, bin_means, bin_errors):
 time = np.array([])
 flux = np.array([])
 # File path to the CSV file
-file_path = 'C:/Users/jakem/OneDrive/Documents/Year 4 Project/Data/TICID_350765919_Sector_34_Cadence_LC.csv'
+file_path = 'C:/Users/jakem/OneDrive/Documents/Year 4 Project/Data/V392 Hyra (63)LC.csv'
 # Open and read the CSV file
 with open(file_path, 'r') as file:
     reader = csv.reader(file)
@@ -118,8 +133,8 @@ print(scipy.__version__)
 lightcurve_plot(time, flux)
 frequency, power = Lomb_Scargle(time,flux,file_path)
 peak_frequency, peak_period = peak_finder(frequency, power)
-phase, folded_flux = fold_data(time, flux, peak_period)
-bin_centers, bin_means, bin_errors = bin_folded_data(phase, folded_flux)
-plot_folded_data(bin_centers,bin_means,bin_errors)
+#phase, folded_flux = fold_data(time, flux, peak_period)
+#bin_centers, bin_means, bin_errors = bin_folded_data(phase, folded_flux)
+#plot_folded_data(bin_centers,bin_means,bin_errors)
 
 plt.figure(figsize=(10, 6))
