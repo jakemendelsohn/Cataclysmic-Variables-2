@@ -60,6 +60,14 @@ def Lomb_Scargle(time,flux,file_name):
     fap = ls.false_alarm_probability(max(power))
     print(f"False Alarm Probability: {fap}")
     
+    #Plot peaks#
+    peak_frequencies, peak_powers = peak_finder(frequency, power)
+    y_vals = np.linspace(0,np.max(peak_powers)*np.max(peak_frequencies)*0.3,1000)
+    for i in range(0,len(peak_powers)):
+        x_vals = np.linspace(peak_frequencies[i],peak_frequencies[i],1000)
+        plt.plot(x_vals,y_vals,linestyle = ':',label = peak_frequencies[i])
+
+    plt.legend(title = "Peak Frequencies (c/d)")
     # Show the plot
     plt.show()
     return frequency,power   
@@ -76,6 +84,7 @@ def peak_finder(frequency, power,  height_threshold=0.007, prominence=0.0001):
     print("Found peaks at the following frequencies (c/d) and their corresponding powers:")
     for i in range(len(peaks)):
         print(f"Peak {i + 1}: Frequency = {peak_frequencies[i]:.6f} c/d, Power = {peak_powers[i]:.6e}")
+        
     
     return peak_frequencies, peak_powers
     #peak_idx = np.argmax(power*frequency)  # Index of the peak power
@@ -132,7 +141,7 @@ print(time)
 print(scipy.__version__)
 lightcurve_plot(time, flux)
 frequency, power = Lomb_Scargle(time,flux,file_path)
-peak_frequency, peak_period = peak_finder(frequency, power)
+#peak_frequency, peak_period = peak_finder(frequency, power)
 #phase, folded_flux = fold_data(time, flux, peak_period)
 #bin_centers, bin_means, bin_errors = bin_folded_data(phase, folded_flux)
 #plot_folded_data(bin_centers,bin_means,bin_errors)
