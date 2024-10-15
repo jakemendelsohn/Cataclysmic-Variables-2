@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import csv
 from scipy.signal import find_peaks
 import scipy
+import matplotlib.cm as cm
 
 
 def lightcurve_plot(time, flux):
@@ -62,7 +63,7 @@ def Lomb_Scargle(time,flux,file_name):
     
     #Plot peaks#
     peak_frequencies, peak_powers = peak_finder(frequency, power)
-    y_vals = np.linspace(0,np.max(peak_powers)*np.max(peak_frequencies)*0.3,1000)
+    y_vals = np.linspace(0,np.max(peak_powers)*np.max(peak_frequencies)*0.2,1000)
     for i in range(0,len(peak_powers)):
         x_vals = np.linspace(peak_frequencies[i],peak_frequencies[i],1000)
         plt.plot(x_vals,y_vals,linestyle = ':',label = peak_frequencies[i])
@@ -72,7 +73,7 @@ def Lomb_Scargle(time,flux,file_name):
     plt.show()
     return frequency,power   
 
-def peak_finder(frequency, power,  height_threshold=0.007, prominence=0.0001):
+def peak_finder(frequency, power,  height_threshold=0.005, prominence=0.0001):
     y = frequency*power
     peaks, properties = find_peaks(y, height=height_threshold, prominence=prominence)
     
@@ -99,7 +100,7 @@ def fold_data(time, flux, period):
     phase = np.mod(time, period)/period
     return phase, flux
 
-def bin_folded_data(phase, flux, num_bins=20):
+def bin_folded_data(phase, flux, num_bins=50):
     bins = np.linspace(0, 1, num_bins+1)
     bin_centers = 0.5 * (bins[1:] + bins[:-1])
     bin_means = np.zeros(num_bins)
@@ -122,6 +123,22 @@ def plot_folded_data(bin_centers, bin_means, bin_errors):
                  yerr=np.concatenate([bin_errors, bin_errors]), 
                  fmt='k.', label='Binned Data')
     
+def phase_fold(time, flux, peak_frequencies):
+    peak_periods = 1/peak_frequencies
+    
+    colors = ['r','g','b','y','c']
+    
+    for i in range(0,len(peak_periods)):
+        phase = (time % peak_periods[i]) / peak_periods[i]
+        bin_centers, bin_means, bin_errors = bin_folded_data(phase,flux)
+        plt.errorbar(np.concatenate([bin_centers, bin_centers +1]), 
+                     np.concatenate([bin_means, bin_means]), 
+                     yerr=np.concatenate([bin_errors, bin_errors]), 
+                     fmt='k.', label=peak_frequencies[i],color = colors[i])
+    plt.legend(title = "Peak Frequencies (c/d)")
+    plt.xlabel("Phase")
+    plt.ylabel("Flux e/s")
+    
 
 # Variables to store the second and third columns
 time = np.array([])
@@ -141,9 +158,10 @@ print(time)
 print(scipy.__version__)
 lightcurve_plot(time, flux)
 frequency, power = Lomb_Scargle(time,flux,file_path)
-#peak_frequency, peak_period = peak_finder(frequency, power)
+peak_frequencies, peak_powers = peak_finder(frequency, power)
 #phase, folded_flux = fold_data(time, flux, peak_period)
 #bin_centers, bin_means, bin_errors = bin_folded_data(phase, folded_flux)
 #plot_folded_data(bin_centers,bin_means,bin_errors)
+phase_fold(time,flux,peak_frequencies)
 
 plt.figure(figsize=(10, 6))
