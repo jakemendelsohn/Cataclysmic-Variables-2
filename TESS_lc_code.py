@@ -91,23 +91,19 @@ def peak_finder(frequency, power,  height_threshold=0.05, prominence=0.0001):
     
     return peak_frequencies, peak_powers
 
-def peak_classification(frequency,power,peak_frequencies,peak_powers,orbital_period = 0.06823,spin_period = 0.046546):
+def peak_classification(frequency,power,peak_frequencies,peak_powers,orbital_period = 0.06823,spin_period = 0.046546,tolerance = 0.001):
     natural_orbital_frequency = 1/orbital_period
-    natural_spin_period = 1/spin_period
-    print(natural_orbital_frequency)
+    natural_spin_frequency = 1/spin_period
     orbital_frequencies = []
     spin_frequencies = []
-    
     for freq in peak_frequencies:
-        # Check if it's close to the natural orbital frequency or its harmonics
-        #if abs(freq - natural_orbital_frequency) < 0.5:
-            #orbital_frequencies.append(freq)
-        if abs(freq % natural_orbital_frequency) < 0.1:
-            orbital_frequencies.append(freq)  
-            
+        if abs(freq / natural_orbital_frequency - round(freq / natural_orbital_frequency)) < tolerance:
+            orbital_frequencies.append(freq)
+        if abs(freq / natural_spin_frequency - round(freq / natural_spin_frequency)) < tolerance:
+            spin_frequencies.append(freq)
     
     print(orbital_frequencies)
-
+    print(spin_frequencies)
 
 time,flux,exptime = sector_data()
 frequency,power,peak_frequencies,peak_powers = Lomb_Scargle(time,flux,exptime)
