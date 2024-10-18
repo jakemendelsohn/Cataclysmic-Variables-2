@@ -64,13 +64,23 @@ def Lomb_Scargle(time,flux,exptime):
     
     #Plot peaks#
     peak_frequencies, peak_powers = peak_finder(frequency, power)
+    orbital_frequencies, spin_frequencies,remaining_frequencies = peak_classification(frequency,power,peak_frequencies,peak_powers,orbital_period = 0.068233846,spin_period = 0.046546484,tolerance = 0.001)
     y_vals = np.linspace(0,13,1000)
-    for i in range(0,len(peak_powers)):
-       x_vals = np.linspace(peak_frequencies[i],peak_frequencies[i],1000)
-       plt.plot(x_vals,y_vals,linestyle = ':',label = peak_frequencies[i])
-
-
-    #plt.legend(title = "Peak Frequencies (c/d)")
+    for freq in orbital_frequencies:
+        x_vals = np.linspace(freq,freq,1000)
+        plt.plot(x_vals,y_vals,linestyle = ":", color = 'blue')
+    for freq1 in spin_frequencies:
+        x_vals = np.linspace(freq1,freq1,1000)
+        plt.plot(x_vals,y_vals,linestyle = ":", color = 'red')
+    print("The remaining frequency peaks are", remaining_frequencies)
+    x_values = np.linspace(remaining_frequencies[7], remaining_frequencies[7],1000)
+    plt.plot(x_values,y_vals,linestyle = ":", color = 'green')
+    
+    
+    plt.plot([], [], linestyle=":", color='blue', label='Orbital Frequencies')  # Add one blue line to the legend
+    plt.plot([], [], linestyle=":", color='red', label='Spin Frequencies')      # Add one red line to the legend
+    plt.plot([], [], linestyle=":", color='green', label='Remaining Frequencies')
+    plt.legend()
     # Show the plot
     plt.show()
     return frequency,power,peak_frequencies,peak_powers
@@ -91,7 +101,7 @@ def peak_finder(frequency, power,  height_threshold=0.05, prominence=0.0001):
     
     return peak_frequencies, peak_powers
 
-def peak_classification(frequency,power,peak_frequencies,peak_powers,orbital_period = 0.06823,spin_period = 0.046546,tolerance = 0.001):
+def peak_classification(frequency,power,peak_frequencies,peak_powers,orbital_period = 0.068233846,spin_period = 0.046546484,tolerance = 0.001):
     natural_orbital_frequency = 1/orbital_period
     natural_spin_frequency = 1/spin_period
     orbital_frequencies = []
@@ -102,9 +112,13 @@ def peak_classification(frequency,power,peak_frequencies,peak_powers,orbital_per
         if abs(freq / natural_spin_frequency - round(freq / natural_spin_frequency)) < tolerance:
             spin_frequencies.append(freq)
     
-    print(orbital_frequencies)
-    print(spin_frequencies)
+    
+    classified_frequencies = set(orbital_frequencies + spin_frequencies)
+    
+    # Filter out the frequencies that are in the classified frequencies set
+    remaining_frequencies = [freq for freq in peak_frequencies if freq not in classified_frequencies]
+    return orbital_frequencies, spin_frequencies,remaining_frequencies 
 
 time,flux,exptime = sector_data()
 frequency,power,peak_frequencies,peak_powers = Lomb_Scargle(time,flux,exptime)
-peak_classification(frequency,power,peak_frequencies,peak_powers)
+#peak_classification(frequency,power,peak_frequencies,peak_powers)
