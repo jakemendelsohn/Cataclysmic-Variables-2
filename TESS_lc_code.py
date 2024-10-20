@@ -44,15 +44,16 @@ def Lomb_Scargle(time,flux,exptime):
     num_frequency_points = 100000  # You can adjust this based on the desired resolution
     frequency = np.linspace(min_freq*100, max_freq/5, num_frequency_points)
     ls = LombScargle(time, flux)
-    power = ls.power(frequency)# Manually compute power without autopower
+    power = ls.power(frequency,normalization = 'model')# Manually compute power without autopower
     # Plot the Lomb-Scargle Periodogram
     plt.figure(figsize=(10, 6))
     plt.plot(frequency, power*frequency, 'k', lw=1)
     
     # Set logarithmic scale for frequency and power if needed
     plt.xscale('log')
-    #plt.yscale('log')
-    plt.yscale('linear')
+    plt.yscale('log')
+    #plt.yscale('linear')
+    #plt.xscale('linear')
     
     # Set axis labels
     plt.xlabel('Frequency (c/d)')
@@ -72,8 +73,8 @@ def Lomb_Scargle(time,flux,exptime):
     for freq1 in spin_frequencies:
         x_vals = np.linspace(freq1,freq1,1000)
         plt.plot(x_vals,y_vals,linestyle = ":", color = 'red')
-    print("The remaining frequency peaks are", remaining_frequencies)
-    x_values = np.linspace(remaining_frequencies[7], remaining_frequencies[7],1000)
+    #print("The remaining frequency peaks are", remaining_frequencies)
+    x_values = np.linspace(22.47804849975284,22.47804849975284,1000)
     plt.plot(x_values,y_vals,linestyle = ":", color = 'green')
     
     
@@ -85,7 +86,7 @@ def Lomb_Scargle(time,flux,exptime):
     plt.show()
     return frequency,power,peak_frequencies,peak_powers
 
-def peak_finder(frequency, power,  height_threshold=0.05, prominence=0.0001):
+def peak_finder(frequency, power,  height_threshold=0.02, prominence=0.0001):
     y = frequency*power
     peaks, properties = find_peaks(y, height=height_threshold, prominence=prominence)
     
@@ -96,8 +97,8 @@ def peak_finder(frequency, power,  height_threshold=0.05, prominence=0.0001):
     # Print the results
     print("Found peaks at the following frequencies (c/d) and their corresponding powers:")
     for i in range(len(peaks)):
-        print(f"Peak {i + 1}: Frequency = {peak_frequencies[i]:.6f} c/d, Power = {peak_powers[i]:.6e}, Period = {1/peak_frequencies[i]:.6f} d")
-        
+        #print(f"Peak {i + 1}: Frequency = {peak_frequencies[i]:.6f} c/d, Power = {peak_powers[i]:.6e}, Period = {1/peak_frequencies[i]:.6f} d")
+        a=1
     
     return peak_frequencies, peak_powers
 
@@ -111,13 +112,37 @@ def peak_classification(frequency,power,peak_frequencies,peak_powers,orbital_per
             orbital_frequencies.append(freq)
         if abs(freq / natural_spin_frequency - round(freq / natural_spin_frequency)) < tolerance:
             spin_frequencies.append(freq)
-    
-    
     classified_frequencies = set(orbital_frequencies + spin_frequencies)
     
     # Filter out the frequencies that are in the classified frequencies set
     remaining_frequencies = [freq for freq in peak_frequencies if freq not in classified_frequencies]
-    return orbital_frequencies, spin_frequencies,remaining_frequencies 
+    
+    tolerance2 = 2  # For example, consider frequencies within 0.1 c/d as "close"
+    print("spin",spin_frequencies)
+    print("orbital", orbital_frequencies)
+    # List to store new frequencies
+    new_frequencies = []
+    
+    # Loop through remaining frequencies
+    for freq in remaining_frequencies:
+        # Check if this frequency is close to any orbital or spin frequency
+        is_known = np.any(np.abs(orbital_frequencies - freq) < tolerance2) or np.any(np.abs(spin_frequencies - freq) < tolerance2)
+        
+        # If it's not close to any known frequency, add it to new_frequencies
+        if not is_known:
+            new_frequencies.append(freq)
+            
+    # Convert new_frequencies to a numpy array for easier handling (optional)
+    new_frequencies = np.array(new_frequencies)
+            
+            # Output the new frequencies
+    print("New frequencies:", new_frequencies)
+    return orbital_frequencies, spin_frequencies,new_frequencies
+
+def false_alarm(ls,power,specific_frequency):
+    closest_idx = np.argmin(np.abs(frequency - specific_frequency))
+    prob = ls.false_alarm_probability(power[closest_idx])
+    return prob
 
 time,flux,exptime = sector_data()
 frequency,power,peak_frequencies,peak_powers = Lomb_Scargle(time,flux,exptime)
