@@ -12,21 +12,21 @@ from scipy.signal import find_peaks
 import lightkurve as lk
 
 
-def sector_data():
+def sector_data(index):
     search_result = lk.search_lightcurve('EX Hydrae', mission='TESS')
     print(search_result)
-    lc = search_result[3].download()
-    exptime = search_result.table['exptime'][3]
+    lc = search_result[index].download()
+    exptime = search_result.table['exptime'][index]
     sap_lc = lc.SAP_FLUX
     sap_lc_cleaned = sap_lc.remove_nans()
-    sap_lc_cleaned.plot()
-    plt.figure(figsize=(12, 6))
-    plt.show()
+    #sap_lc_cleaned.plot()
+    #plt.figure(figsize=(12, 6))
+    #plt.show()
     time = sap_lc_cleaned.time.value
     flux = sap_lc_cleaned.flux.value
-    periodogram = sap_lc_cleaned.to_periodogram(normalization='amplitude', minimum_frequency=10, maximum_frequency=1000)
-    periodogram.plot()
-    plt.show()
+    #periodogram = sap_lc_cleaned.to_periodogram(normalization='amplitude', minimum_frequency=10, maximum_frequency=1000)
+    #periodogram.plot()
+    #plt.show()
     return time,flux,exptime
     
 
@@ -65,7 +65,11 @@ def Lomb_Scargle(time,flux,exptime):
     
     #Plot peaks#
     peak_frequencies, peak_powers = peak_finder(frequency, power)
-    orbital_frequencies, spin_frequencies,remaining_frequencies = peak_classification(frequency,power,peak_frequencies,peak_powers,orbital_period = 0.068233846,spin_period = 0.046546484,tolerance = 0.001)
+    orbital_frequencies, spin_frequencies,new_frequencies = peak_classification(frequency,power,peak_frequencies,peak_powers,orbital_period = 0.068233846,spin_period = 0.046546484,tolerance = 0.001)
+    for freq2 in new_frequencies:
+        alrm = false_alarm(ls, power,frequency, freq2)
+        #print("Freq", freq2, ":", alrm)
+    
     y_vals = np.linspace(0,13,1000)
     for freq in orbital_frequencies:
         x_vals = np.linspace(freq,freq,1000)
@@ -84,7 +88,53 @@ def Lomb_Scargle(time,flux,exptime):
     plt.legend()
     # Show the plot
     plt.show()
-    return frequency,power,peak_frequencies,peak_powers
+    return frequency,power,orbital_frequencies,spin_frequencies,new_frequencies
+
+def mulitple_sector_LS(index_list):
+    results = {}
+
+    # Iterate over the index list and call the original function
+    for idx in index_list:
+        time, flux, exptime = sector_data(idx)
+        
+        # Storing the 3 results as a tuple in a dictionary for easy access
+        results[f"var_{idx}_1_2_3"] = (time, flux, exptime)
+    times = [value[0] for value in results.values()]
+    fluxes = [value[1] for value in results.values()]
+    exptimes = [value[2] for value in results.values()]
+    
+    results2 = {}
+    for i in range (0,len(times)):
+        frequency,power,orbital_frequencies,spin_frequencies,new_frequencies = Lomb_Scargle(times[i],fluxes[i],exptimes[i])
+        results2[f"var_{i}_1_2_3_4_5"] = (frequency,power,orbital_frequencies,spin_frequencies,new_frequencies)
+
+    frequencies = [value[0] for value in results2.values()]
+    powers = [value[1] for value in results2.values()]
+    orbitals = [value[2] for value in results2.values()]
+    spins = [value[3] for value in results2.values()]
+    news = [value[4] for value in results2.values()]
+    
+    
+    fig, (ax1, ax2) = plt.subplots(nrows=2, figsize=(10, 12), sharex=True)
+    plt.subplots_adjust(hspace=0)  # hspace=0 removes the space between the subplot
+    
+    ax1.set_xscale('log')
+    ax1.set_yscale('log')
+    ax2.set_xscale('log')
+    ax2.set_yscale('log')
+    ax2.set_xlabel('Frequency (c/d)')
+    fig.text(0, 0.5, 'Power x Frequency', va='center', rotation='vertical', fontsize=12)
+    
+    
+    #AX1#
+    ax1.plot(frequencies[0], powers[0]*frequencies[0], 'k', lw=1)
+    
+    #AX2#
+    ax2.plot(frequencies[1], powers[1]*frequencies[1], 'k', lw=1)
+    
+    # Show both plots vertically
+    plt.tight_layout()
+    plt.show()
 
 def peak_finder(frequency, power,  height_threshold=0.02, prominence=0.0001):
     y = frequency*power
@@ -93,12 +143,6 @@ def peak_finder(frequency, power,  height_threshold=0.02, prominence=0.0001):
     # Extract the frequencies and powers of the found peaks
     peak_frequencies = frequency[peaks]
     peak_powers = y[peaks]
-    
-    # Print the results
-    print("Found peaks at the following frequencies (c/d) and their corresponding powers:")
-    for i in range(len(peaks)):
-        #print(f"Peak {i + 1}: Frequency = {peak_frequencies[i]:.6f} c/d, Power = {peak_powers[i]:.6e}, Period = {1/peak_frequencies[i]:.6f} d")
-        a=1
     
     return peak_frequencies, peak_powers
 
@@ -117,7 +161,7 @@ def peak_classification(frequency,power,peak_frequencies,peak_powers,orbital_per
     # Filter out the frequencies that are in the classified frequencies set
     remaining_frequencies = [freq for freq in peak_frequencies if freq not in classified_frequencies]
     
-    tolerance2 = 2  # For example, consider frequencies within 0.1 c/d as "close"
+    tolerance2 = 0.3  # For example, consider frequencies within 0.1 c/d as "close"
     print("spin",spin_frequencies)
     print("orbital", orbital_frequencies)
     # List to store new frequencies
@@ -139,11 +183,16 @@ def peak_classification(frequency,power,peak_frequencies,peak_powers,orbital_per
     print("New frequencies:", new_frequencies)
     return orbital_frequencies, spin_frequencies,new_frequencies
 
-def false_alarm(ls,power,specific_frequency):
+def false_alarm(ls,power,frequency,specific_frequency):
     closest_idx = np.argmin(np.abs(frequency - specific_frequency))
     prob = ls.false_alarm_probability(power[closest_idx])
     return prob
 
-time,flux,exptime = sector_data()
-frequency,power,peak_frequencies,peak_powers = Lomb_Scargle(time,flux,exptime)
+
+
+indexes = [1,3]
+index = 3
+mulitple_sector_LS(indexes)
+#time,flux,exptime = sector_data(index)
+#frequency,power,peak_frequencies,peak_powers = Lomb_Scargle(time,flux,exptime)
 #peak_classification(frequency,power,peak_frequencies,peak_powers)
