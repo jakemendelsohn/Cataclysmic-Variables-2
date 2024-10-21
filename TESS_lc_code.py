@@ -122,15 +122,44 @@ def mulitple_sector_LS(index_list):
     ax1.set_yscale('log')
     ax2.set_xscale('log')
     ax2.set_yscale('log')
-    ax2.set_xlabel('Frequency (c/d)')
-    fig.text(0, 0.5, 'Power x Frequency', va='center', rotation='vertical', fontsize=12)
+    ax2.set_xlabel('Frequency (c/d)', fontsize = 14)
+    fig.text(0, 0.5, 'Power x Frequency', va='center', rotation='vertical', fontsize=14)
+    ax1.tick_params(axis='both', which='major', labelsize=14)
+    ax2.tick_params(axis='both', which='major', labelsize=14)
     
     
     #AX1#
     ax1.plot(frequencies[0], powers[0]*frequencies[0], 'k', lw=1)
-    
+    y_vals = np.linspace(0,13,1000)
+    for freq in orbitals[0]:
+        x_vals = np.linspace(freq,freq,1000)
+        ax1.plot(x_vals,y_vals,linestyle = ":", color = 'blue')
+    for freq1 in spins[0]:
+        x_vals = np.linspace(freq1,freq1,1000)
+        ax1.plot(x_vals,y_vals,linestyle = ":", color = 'red')
+    #print("The remaining frequency peaks are", remaining_frequencies)
+    x_values = np.linspace(22.47804849975284,22.47804849975284,1000)
+    ax1.plot(x_values,y_vals,linestyle = ":", color = 'green')
     #AX2#
     ax2.plot(frequencies[1], powers[1]*frequencies[1], 'k', lw=1)
+    y_vals = np.linspace(0,13,1000)
+    for freq in orbitals[1]:
+        x_vals = np.linspace(freq,freq,1000)
+        ax2.plot(x_vals,y_vals,linestyle = ":", color = 'blue')
+    for freq1 in spins[1]:
+        x_vals = np.linspace(freq1,freq1,1000)
+        ax2.plot(x_vals,y_vals,linestyle = ":", color = 'red')
+    #print("The remaining frequency peaks are", remaining_frequencies)
+    x_values = np.linspace(22.47804849975284,22.47804849975284,1000)
+    ax2.plot(x_values,y_vals,linestyle = ":", color = 'green')
+    
+    
+    #Legend#
+    plt.plot([], [], linestyle=":", color='blue', label='Orbital Frequencies')  # Add one blue line to the legend
+    plt.plot([], [], linestyle=":", color='red', label='Spin Frequencies')      # Add one red line to the legend
+    plt.plot([], [], linestyle=":", color='green', label='Remaining Frequencies')
+    plt.legend()
+    
     
     # Show both plots vertically
     plt.tight_layout()
