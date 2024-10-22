@@ -164,6 +164,8 @@ def mulitple_sector_LS(index_list):
     # Show both plots vertically
     plt.tight_layout()
     plt.show()
+    
+    return times, fluxes, orbitals, spins, news
 
 def peak_finder(frequency, power,  height_threshold=0.02, prominence=0.0001):
     y = frequency*power
@@ -217,11 +219,40 @@ def false_alarm(ls,power,frequency,specific_frequency):
     prob = ls.false_alarm_probability(power[closest_idx])
     return prob
 
+def bin_folded_data(phase, flux, num_bins=50):
+    bins = np.linspace(0, 1, num_bins+1)
+    bin_centers = 0.5 * (bins[1:] + bins[:-1])
+    bin_means = np.zeros(num_bins)
+    bin_errors = np.zeros(num_bins)
+    
+    for i in range(num_bins):
+        in_bin = (phase >= bins[i]) & (phase < bins[i+1])
+        bin_means[i] = np.mean(flux[in_bin])
+        bin_errors[i] = np.std(flux[in_bin]) / np.sqrt(np.sum(in_bin))  # Standard error
+    
+    return bin_centers, bin_means, bin_errors
+
+def phase_fold_binned(time, flux, peak_frequencies):
+    peak_periods = 1/peak_frequencies 
+    colors = ['r','g','b','y','c']
+    
+    for i in range(0,len(peak_periods)):
+        phase = (time % peak_periods[i]) / peak_periods[i]
+        bin_centers, bin_means, bin_errors = bin_folded_data(phase,flux)
+        plt.errorbar(np.concatenate([bin_centers, bin_centers +1]), 
+                     np.concatenate([bin_means, bin_means]), 
+                     yerr=np.concatenate([bin_errors, bin_errors]), 
+                     fmt='k.', label=peak_frequencies[i],color = colors[i])
+    plt.legend(title = "Peak Frequencies (c/d)")
+    plt.xlabel("Phase")
+    plt.ylabel("Flux e/s")
 
 
 indexes = [1,3]
 index = 3
-mulitple_sector_LS(indexes)
+times, fluxes, orbitals, spins, news = mulitple_sector_LS(indexes)
+peak_frequencies = np.array([21.486123909219167,14.656134673552952,22.4780485])
+phase_fold_binned(times[1], fluxes[1], peak_frequencies)
 #time,flux,exptime = sector_data(index)
 #frequency,power,peak_frequencies,peak_powers = Lomb_Scargle(time,flux,exptime)
 #peak_classification(frequency,power,peak_frequencies,peak_powers)
