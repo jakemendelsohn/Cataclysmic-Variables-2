@@ -20,9 +20,9 @@ def sector_data(index):
     sap_lc = lc.SAP_FLUX
     sap_lc_cleaned = sap_lc.remove_nans()
     #sap_lc_cleaned.plot()
-    #plt.figure(figsize=(12, 6))
     #plt.show()
     time = sap_lc_cleaned.time.value
+    #plt.figure(figsize=(12, 6))
     flux = sap_lc_cleaned.flux.value
     #periodogram = sap_lc_cleaned.to_periodogram(normalization='amplitude', minimum_frequency=10, maximum_frequency=1000)
     #periodogram.plot()
@@ -132,6 +132,9 @@ def mulitple_sector_LS(index_list):
     ax1.tick_params(axis='both', which='major', labelsize=14)
     ax2.tick_params(axis='both', which='major', labelsize=14)
     
+    #Interesting_frequencies#
+    freq_int_manual1 = [3.666359,13.25642,30.18369,71.38979]
+    freq_int_manual2 = [3.666359,13.25642,30.18369,71.38979]
     
     #AX1#
     ax1.plot(frequencies[0], powers[0]*frequencies[0], 'k', lw=1)
@@ -145,9 +148,12 @@ def mulitple_sector_LS(index_list):
     for freq2 in beats[0]:
         x_vals = np.linspace(freq2,freq2,1000)
         ax1.plot(x_vals,y_vals,linestyle = ":", color = 'black')
+    for freq3 in freq_int_manual1:
+        x_vals = np.linspace(freq3,freq3,1000)
+        ax1.plot(x_vals,y_vals,linestyle = ":", color = 'green')
     #print("The remaining frequency peaks are", remaining_frequencies)
-    x_values = np.linspace(22.47804849975284,22.47804849975284,1000)
-    ax1.plot(x_values,y_vals,linestyle = ":", color = 'green')
+
+    
     #AX2#
     ax2.plot(frequencies[1], powers[1]*frequencies[1], 'k', lw=1)
     y_vals = np.linspace(0,13,1000)
@@ -160,9 +166,11 @@ def mulitple_sector_LS(index_list):
     for freq2 in beats[1]:
         x_vals = np.linspace(freq2,freq2,1000)
         plt.plot(x_vals,y_vals,linestyle = ":", color = 'black')
+    for freq3 in freq_int_manual2:
+        x_vals = np.linspace(freq3,freq3,1000)
+        ax2.plot(x_vals,y_vals,linestyle = ":", color = 'green')
     #print("The remaining frequency peaks are", remaining_frequencies)
-    x_values = np.linspace(22.47804849975284,22.47804849975284,1000)
-    ax2.plot(x_values,y_vals,linestyle = ":", color = 'green')
+
     
     
     #Legend#
@@ -179,7 +187,7 @@ def mulitple_sector_LS(index_list):
     
     return times, fluxes, orbitals, spins, news
 
-def peak_finder(frequency, power,  height_threshold=0.02, prominence=0.01):
+def peak_finder(frequency, power,  height_threshold=0.02, prominence=0.001):
     y = frequency*power
     peaks, properties = find_peaks(y, height=height_threshold, prominence=prominence)
     
@@ -189,7 +197,8 @@ def peak_finder(frequency, power,  height_threshold=0.02, prominence=0.01):
     
     return peak_frequencies, peak_powers
 
-def peak_classification(frequency,power,peak_frequencies,peak_powers,tolerance = 0.0015):
+def peak_classification(frequency,power,peak_frequencies,peak_powers,tolerance = 0.002):
+    orbital_period = 0.05906594299
     orbital_period = 0.05979267
     spin_period = 0.02679429
     natural_orbital_frequency = 1/orbital_period
@@ -210,7 +219,6 @@ def peak_classification(frequency,power,peak_frequencies,peak_powers,tolerance =
     
     # Filter out the frequencies that are in the classified frequencies set
     remaining_frequencies = [freq for freq in peak_frequencies if freq not in classified_frequencies]
-    
     tolerance2 = 0.3  # For example, consider frequencies within 0.1 c/d as "close"
     print("spin",spin_frequencies)
     print("orbital", orbital_frequencies)
