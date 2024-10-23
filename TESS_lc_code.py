@@ -18,7 +18,9 @@ def sector_data(index):
     lc = search_result[index].download()
     exptime = search_result.table['exptime'][index]
     sap_lc = lc.SAP_FLUX
-    sap_lc_cleaned = sap_lc.remove_nans()
+    #sap_lc_cleaned = sap_lc.remove_nans()
+    sap_lc_cleaned = sap_lc.remove_outliers()
+    #sap_lc_cleaned2 = lc.remove_quality_flags()
     #sap_lc_cleaned.plot()
     #plt.show()
     time = sap_lc_cleaned.time.value
@@ -28,6 +30,39 @@ def sector_data(index):
     #periodogram.plot()
     #plt.show()
     return time,flux,exptime
+
+def multiple_LC_plot(index_list):
+    results = {}
+
+    # Iterate over the index list and call the original function
+    for idx in index_list:
+        time, flux, exptime = sector_data(idx)
+        
+        # Storing the 3 results as a tuple in a dictionary for easy access
+        results[f"var_{idx}_1_2_3"] = (time, flux, exptime)
+    times = [value[0] for value in results.values()]
+    fluxes = [value[1] for value in results.values()]
+    
+    # Plotting
+    plt.figure(figsize=(10, 6))
+    
+    # Use a color map to assign different colors to each sector
+    colors = plt.cm.viridis(np.linspace(0, 1, len(index_list)))
+    
+    # Iterate through each sector and plot with a different color
+    for i, (time, flux) in enumerate(zip(times, fluxes)):
+        plt.plot(time, flux, lw=1, color=colors[i], label=f'Sector {index_list[i]}')
+    
+    plt.xlabel('Time (MJD)')
+    plt.ylabel('Flux (e/s)')
+    plt.title('DW Cnc Light Curve')
+    plt.legend(loc='best', fontsize='small')  # Add a legend to identify sectors
+    plt.show()
+    
+    
+        
+    
+    
     
 
 def frequency_range(time,flux,del_t):
@@ -204,7 +239,6 @@ def peak_classification(frequency,power,peak_frequencies,peak_powers,tolerance =
     natural_orbital_frequency = 1/orbital_period
     natural_spin_frequency = 1/spin_period
     natural_beat_frequency = abs(natural_spin_frequency-natural_orbital_frequency)
-    print("nat", natural_beat_frequency)
     orbital_frequencies = []
     spin_frequencies = []
     beat_frequencies = []
@@ -239,7 +273,7 @@ def peak_classification(frequency,power,peak_frequencies,peak_powers,tolerance =
     new_frequencies = np.array(new_frequencies)
             
             # Output the new frequencies
-    print("New frequencies:", new_frequencies)
+    #print("New frequencies:", new_frequencies)
     return orbital_frequencies, spin_frequencies,new_frequencies, beat_frequencies
 
 def false_alarm(ls,power,frequency,specific_frequency):
@@ -276,8 +310,8 @@ def phase_fold_binned(time, flux, peak_frequencies):
     plt.ylabel("Flux e/s")
 
 
-indexes = [3,4]
-index = 3
+indexes = [2,3]
+multiple_LC_plot(indexes)
 times, fluxes, orbitals, spins, news = mulitple_sector_LS(indexes)
 peak_frequencies = np.array([21.486123909219167,14.656134673552952,22.4780485])
 #phase_fold_binned(times[1], fluxes[1], peak_frequencies)
