@@ -106,6 +106,8 @@ def Lomb_Scargle(time,flux,exptime):
     for freq2 in new_frequencies:
         alrm = false_alarm(ls, power,frequency, freq2)
         #print("Freq", freq2, ":", alrm)
+        
+    freq_int_manual2 = [16.56576]
     
     y_vals = np.linspace(0,13,1000)
     for freq in orbital_frequencies:
@@ -225,6 +227,49 @@ def mulitple_sector_LS(index_list):
     
     return times, fluxes, orbitals, spins, news
 
+def Lomb_Scargle_2D(time, flux, exptime, window_size, step_size, min_freq, max_freq):
+    # Parameters for the frequency range
+    num_frequency_points = 1000  # Increase if higher frequency resolution is needed
+    frequencies = np.linspace(min_freq, max_freq, num_frequency_points)
+
+    # Prepare to store the 2D power spectrum (rows: time windows, columns: frequencies)
+    power_spectrum_2D = []
+
+    # Sliding window through the data
+    time_start = min(time)
+    time_end = max(time)
+    current_time = time_start
+
+    # Loop through the time windows
+    while current_time + window_size <= time_end:
+        # Find indices of the data within the current window
+        window_mask = (time >= current_time) & (time < current_time + window_size)
+        time_window = time[window_mask]
+        flux_window = flux[window_mask]
+
+        # Compute the Lomb-Scargle periodogram for the current window
+        ls = LombScargle(time_window, flux_window)
+        power = ls.power(frequencies)
+        power_spectrum_2D.append(power)
+
+        # Move the window
+        current_time += step_size
+
+    # Convert the list of power spectra into a 2D array
+    power_spectrum_2D = np.array(power_spectrum_2D)
+
+    # Generate the time axis (midpoints of each time window)
+    time_axis = np.arange(time_start + window_size / 2, time_end, step_size)
+
+    # Plot the 2D power spectrum
+    plt.figure(figsize=(10, 6))
+    plt.imshow(power_spectrum_2D.T, aspect='auto', extent=[time_axis[0], time_axis[-1], min_freq, max_freq], origin='lower', cmap='inferno')
+    plt.colorbar(label='Power')
+    plt.xlabel('Time (BTJD)')
+    plt.ylabel('Frequency (cycles/day)')
+    plt.title('2D Lomb-Scargle Power Spectrum')
+    plt.show()
+
 def peak_finder(frequency, power,  height_threshold=0.02, prominence=0.001):
     y = frequency*power
     peaks, properties = find_peaks(y, height=height_threshold, prominence=prominence)
@@ -318,6 +363,13 @@ multiple_LC_plot(indexes)
 times, fluxes, orbitals, spins, news = mulitple_sector_LS(indexes)
 peak_frequencies = np.array([37.264,33.445,20.602])
 phase_fold_binned(times[0], fluxes[0], peak_frequencies)
-#time,flux,exptime = sector_data(index)
+time,flux,exptime = sector_data(indexes[0])
 #frequency,power,peak_frequencies,peak_powers = Lomb_Scargle(time,flux,exptime)
 #peak_classification(frequency,power,peak_frequencies,peak_powers)
+window_size = 0.3  # Window size in the same units as time (e.g., days or minutes)
+step_size = 5  # Step size for sliding the window
+min_freq = 5  # Minimum frequency (cycles/day)
+max_freq = 125  # Maximum frequency (cycles/day)
+
+# Call the function with your time, flux, and exptime data
+Lomb_Scargle_2D(time, flux, exptime, window_size, step_size, min_freq, max_freq)
