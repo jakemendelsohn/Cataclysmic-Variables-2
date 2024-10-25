@@ -10,6 +10,7 @@ import numpy as np
 from astropy.timeseries import LombScargle
 from scipy.signal import find_peaks
 import lightkurve as lk
+from scipy.optimize import curve_fit
 
 
 def sector_data(index):
@@ -168,8 +169,10 @@ def mulitple_sector_LS(index_list):
     ax2.tick_params(axis='both', which='major', labelsize=14)
     
     #Interesting_frequencies#
-    freq_int_manual1 = [3.666359,13.25642,30.18369,71.38979]
-    freq_int_manual2 = [3.666359,13.25642,30.18369,71.38979]
+    #freq_int_manual1 = [3.666359,13.25642,30.18369,71.38979]
+    #freq_int_manual2 = [3.666359,13.25642,30.18369,71.38979]
+    freq_int_manual1 = []
+    freq_int_manual2 = [16.56576]
     
     #AX1#
     ax1.plot(frequencies[0], powers[0]*frequencies[0], 'k', lw=1)
@@ -235,6 +238,7 @@ def peak_finder(frequency, power,  height_threshold=0.02, prominence=0.001):
 def peak_classification(frequency,power,peak_frequencies,peak_powers,tolerance = 0.002):
     orbital_period = 0.05906594299
     orbital_period = 0.05979267
+    #orbital_period = 0.06036547674
     spin_period = 0.02679429
     natural_orbital_frequency = 1/orbital_period
     natural_spin_frequency = 1/spin_period
@@ -309,12 +313,11 @@ def phase_fold_binned(time, flux, peak_frequencies):
     plt.xlabel("Phase")
     plt.ylabel("Flux e/s")
 
-
-indexes = [2,3]
+indexes = [0,1]
 multiple_LC_plot(indexes)
 times, fluxes, orbitals, spins, news = mulitple_sector_LS(indexes)
-peak_frequencies = np.array([21.486123909219167,14.656134673552952,22.4780485])
-#phase_fold_binned(times[1], fluxes[1], peak_frequencies)
+peak_frequencies = np.array([37.264,33.445,20.602])
+phase_fold_binned(times[0], fluxes[0], peak_frequencies)
 #time,flux,exptime = sector_data(index)
 #frequency,power,peak_frequencies,peak_powers = Lomb_Scargle(time,flux,exptime)
 #peak_classification(frequency,power,peak_frequencies,peak_powers)
