@@ -117,7 +117,7 @@ def Lomb_Scargle(time,flux,exptime):
         x_vals = np.linspace(freq1,freq1,1000)
         plt.plot(x_vals,y_vals,linestyle = ":", color = 'red')
     for freq2 in beat_frequencies:
-        x_vals = np.linspace(freq1,freq1,1000)
+        x_vals = np.linspace(freq2,freq2,1000)
         plt.plot(x_vals,y_vals,linestyle = ":", color = 'black')
     #print("The remaining frequency peaks are", remaining_frequencies)
     x_values = np.linspace(22.47804849975284,22.47804849975284,1000)
@@ -171,10 +171,10 @@ def mulitple_sector_LS(index_list):
     ax2.tick_params(axis='both', which='major', labelsize=14)
     
     #Interesting_frequencies#
-    #freq_int_manual1 = [3.666359,13.25642,30.18369,71.38979]
-    #freq_int_manual2 = [3.666359,13.25642,30.18369,71.38979]
-    freq_int_manual1 = [3.671158,10.44262,13.2575]
-    freq_int_manual2 = [3.671158,10.44262,13.2575]
+    freq_int_manual1 = [3.671158,10.44262,13.2575,30.1763]
+    freq_int_manual2 = [3.671158,10.44262,13.2575,30.1763]
+    #freq_int_manual1 = [6.8267,22.4769, 81.1037,95.761]
+    #freq_int_manual2 = [6.8267,22.4769, 81.1037,95.761]
     
     #AX1#
     ax1.plot(frequencies[0], powers[0]*frequencies[0], 'k', lw=1)
@@ -281,9 +281,8 @@ def peak_finder(frequency, power,  height_threshold=0.02, prominence=0.001):
     return peak_frequencies, peak_powers
 
 def peak_classification(frequency,power,peak_frequencies,peak_powers,tolerance = 0.002):
-    #orbital_period = 0.05906594299
-    #orbital_period = 0.05641921453
     orbital_period = 0.05979267
+    #orbital_period = 0.068233846
     spin_period = 0.02679429
     natural_orbital_frequency = 1/orbital_period
     natural_spin_frequency = 1/spin_period
@@ -357,13 +356,58 @@ def phase_fold_binned(time, flux, peak_frequencies):
     plt.legend(title = "Peak Frequencies (c/d)")
     plt.xlabel("Phase")
     plt.ylabel("Flux e/s")
+    
+    
+def multi_periodic_model(t, A1, f1, phi1, A2, f2, phi2, A3, f3, phi3, offset):
+    """Model with three sinusoidal components plus an offset"""
+    component1 = A1 * np.sin(2 * np.pi * f1 * t + phi1)  # Spin period
+    component2 = A2 * np.sin(2 * np.pi * f2 * t + phi2)  # Orbital period
+    component3 = A3 * np.sin(2 * np.pi * f3 * t + phi3)  # Beat frequency
+    return component1 + component2 + component3 + offset
+
+def model_fit(time,flux):
+    
+    start_time = 3262
+    end_time = 3266
+
+    subset_indices = (time >= start_time) & (time <= end_time)
+    time_subset = time[subset_indices]
+    flux_subset = flux[subset_indices]
+    
+    initial_guesses = [
+    12,  # A1: Spin amplitude
+    37.26, # f1: Spin frequency 
+    0,    # phi1: Spin phase 
+    12,  # A2: Orbital amplitude 
+    16.7, # f2: Orbital frequency 
+    0,    # phi2: Orbital phase 
+    12,  # A3: Beat amplitude 
+    20.60, # f3: Beat frequency 
+    0,    # phi3
+    150   # offset
+]
+    params, covariance = curve_fit(multi_periodic_model, time_subset, flux_subset, p0=initial_guesses,bounds=([10, 37, -np.pi,10, 16, -np.pi, 10, 20, -np.pi, 140],
+            [25, 38, np.pi, 25, 17, np.pi, 25, 21, np.pi, 160]))
+    A1, f1, phi1, A2, f2, phi2, A3, f3, phi3, offset = params
+    print(params)
+    fitted_flux = multi_periodic_model(time_subset, *params)
+    plt.figure(figsize=(10, 6))
+    plt.plot(time_subset, flux_subset, label='Observed Data', alpha=0.6)
+    plt.plot(time_subset, fitted_flux, label='Fitted Model', color='red')
+    plt.xlabel('Time')
+    plt.ylabel('Flux')
+    plt.legend()
+    plt.title('Multi-Periodic Model Fit')
+    plt.show()
+    
+    return params,covariance,fitted_flux
 
 indexes = [3,4]
 multiple_LC_plot(indexes)
 times, fluxes, orbitals, spins, news = mulitple_sector_LS(indexes)
 peak_frequencies = np.array([37.264,33.445,20.602])
 phase_fold_binned(times[0], fluxes[0], peak_frequencies)
-time,flux,exptime = sector_data(indexes[0])
+time,flux,exptime = sector_data(indexes[1])
 #frequency,power,peak_frequencies,peak_powers = Lomb_Scargle(time,flux,exptime)
 #peak_classification(frequency,power,peak_frequencies,peak_powers)
 window_size = 0.3  # Window size in the same units as time (e.g., days or minutes)
@@ -373,3 +417,4 @@ max_freq = 125  # Maximum frequency (cycles/day)
 
 # Call the function with your time, flux, and exptime data
 Lomb_Scargle_2D(time, flux, exptime, window_size, step_size, min_freq, max_freq)
+model_fit(time,flux)
