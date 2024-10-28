@@ -78,7 +78,7 @@ def Lomb_Scargle(time,flux,exptime):
     min_freq, max_freq = frequency_range(time,flux,exptime)
     # Compute the Lomb-Scargle Periodogram within the specified frequency range
     num_frequency_points = 100000  # You can adjust this based on the desired resolution
-    frequency = np.linspace(min_freq*10, max_freq/5, num_frequency_points)
+    frequency = np.linspace(min_freq, max_freq/5, num_frequency_points)
     ls = LombScargle(time, flux)
     power = ls.power(frequency,normalization = 'model')# Manually compute power without autopower
     # Plot the Lomb-Scargle Periodogram
@@ -173,8 +173,8 @@ def mulitple_sector_LS(index_list):
     #Interesting_frequencies#
     #freq_int_manual1 = [3.666359,13.25642,30.18369,71.38979]
     #freq_int_manual2 = [3.666359,13.25642,30.18369,71.38979]
-    freq_int_manual1 = []
-    freq_int_manual2 = [16.56576]
+    freq_int_manual1 = [3.671158,10.44262,13.2575]
+    freq_int_manual2 = [3.671158,10.44262,13.2575]
     
     #AX1#
     ax1.plot(frequencies[0], powers[0]*frequencies[0], 'k', lw=1)
@@ -281,9 +281,9 @@ def peak_finder(frequency, power,  height_threshold=0.02, prominence=0.001):
     return peak_frequencies, peak_powers
 
 def peak_classification(frequency,power,peak_frequencies,peak_powers,tolerance = 0.002):
-    orbital_period = 0.05906594299
+    #orbital_period = 0.05906594299
+    #orbital_period = 0.05641921453
     orbital_period = 0.05979267
-    #orbital_period = 0.06036547674
     spin_period = 0.02679429
     natural_orbital_frequency = 1/orbital_period
     natural_spin_frequency = 1/spin_period
@@ -358,7 +358,7 @@ def phase_fold_binned(time, flux, peak_frequencies):
     plt.xlabel("Phase")
     plt.ylabel("Flux e/s")
 
-indexes = [0,1]
+indexes = [3,4]
 multiple_LC_plot(indexes)
 times, fluxes, orbitals, spins, news = mulitple_sector_LS(indexes)
 peak_frequencies = np.array([37.264,33.445,20.602])
