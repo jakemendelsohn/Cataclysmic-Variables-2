@@ -6,11 +6,32 @@ Created on Tue Oct 29 11:18:27 2024
 """
 import matplotlib.pyplot as plt
 import numpy as np
+
 from astropy.timeseries import LombScargle
 from scipy.signal import find_peaks
 import lightkurve as lk
 from scipy.optimize import curve_fit
 import pandas as pd
+from astropy.time import Time
+from astropy.coordinates import SkyCoord, EarthLocation
+import astropy.units as u
+from scipy.stats import linregress
+
+
+def time_conversion():
+    hjd_time = Time('2460395.08940', format='jd', scale='utc',location=EarthLocation(lat=19.8283*u.deg, lon=-155.4783*u.deg, height=4160*u.m))  # example HJD
+
+    # Define the target's sky coordinates (RA and Dec) and observer's location
+    ra = '20h15m36.96s'  # Right Ascension of target
+    dec = '37d11m23s'  # Declination of target
+    star_coords = SkyCoord(ra, dec, frame='icrs')
+    
+    # Convert HJD to BJD
+    bjd_time = hjd_time + hjd_time.light_travel_time(star_coords, kind = 'barycentric')
+    
+    print("HJD:", hjd_time.jd)
+    print("BJD:", bjd_time.jd)
+    return bjd_time
 
 def sector_data(index):
     search_result = lk.search_lightcurve('RX J2015.6+3711', mission='TESS')
@@ -27,7 +48,7 @@ def sector_data(index):
     
     time = sap_lc.time.value[good_quality_mask]
     flux = sap_lc.flux.value[good_quality_mask]
-    sap_lc_cleaned = sap_lc.remove_outliers()
+    #sap_lc_cleaned = sap_lc.remove_outliers()
     #time = sap_lc_cleaned.time.value
     #flux = sap_lc_cleaned.flux.value
     return time,flux,exptime
@@ -41,6 +62,7 @@ def ASSASSN_data(time):
     flux = data['flux(mJy)']
     flux_err = data['flux_err']
     
+    
     g_band_data = data[(data['Filter'] == 'g') & (data['flux(mJy)'] < 40) & (data['flux(mJy)'] > 1.8)]
 
     # Save HJD and flux columns in separate variables
@@ -51,6 +73,12 @@ def ASSASSN_data(time):
         g_band_BJD_corrected.append(val)
     
     g_band_flux = g_band_data['flux(mJy)']
+        
+    plt.scatter(g_band_BJD_corrected,g_band_flux,s=1)
+    plt.xlabel("Time (BJD-2457000)")
+    plt.ylabel("Flux")
+    plt.show()
+    
     
     closest_start, closest_end = select_section(g_band_BJD_corrected,time[0],time[-1])
     
@@ -82,20 +110,49 @@ def calibration(time,flux,g_band_BJD_sector, g_band_flux_sector):
     plt.ylabel("Flux (e/s)")
     plt.show()
     
-    ground_time_1st_half = g_band_BJD_sector[len(g_band_BJD_sector)//2:]
-    ground_flux_1st_half = g_band_flux_sector[len(g_band_flux_sector)//2:]
+    ground_time_1st_half = g_band_BJD_sector[:len(g_band_BJD_sector)//2]
+    ground_flux_1st_half = g_band_flux_sector[:len(g_band_flux_sector)//2]
     
     closest_time_values = np.array([time[np.abs(time - f).argmin()] for f in ground_time_1st_half])
     closest_indices = [np.abs(time - f).argmin() for f in ground_time_1st_half]
     matched_flux_values = flux[closest_indices]
-    print(ground_flux_1st_half)
+    print("ground",ground_flux_1st_half)
     print(matched_flux_values)
    # plt.scatter(ground_time_1st_half,ground_flux_1st_half,s=1)
     plt.scatter(matched_flux_values,ground_flux_1st_half)
     plt.xlabel("TESS Flux")
     plt.ylabel("Ground Based Flux")
+
+    # Perform a linear least-squares fit
+    slope, intercept, r_value, p_value, std_err = linregress(matched_flux_values, ground_flux_1st_half)
+
+    # Plot the best-fit line
+    x_fit = np.array([min(matched_flux_values), max(matched_flux_values)])
+    y_fit = slope * x_fit + intercept
+    plt.plot(x_fit, y_fit, color="red", label=f"Fit: y = {slope:.2f}x + {intercept:.2f}")
+
+    # Show fit details
+    plt.legend()
+    plt.show()
+
+    # Print the fit parameters
+    print("Slope:", slope)
+    print("Intercept:", intercept)
+    print("R-squared:", r_value**2)
+    
+    return slope,intercept, r_value
+
+def calibrated_data(slope,intercept,time,flux):
+    flux_calibrated = []
+    for fl in flux:
+        fl = (fl*slope)+intercept
+        flux_calibrated.append(fl)
+    plt.scatter(time,flux,s=1)
+        
+    
     
 
 time,flux,exptime = sector_data(2)
 g_band_BJD_sector, g_band_flux_sector = ASSASSN_data(time)
-calibration(time,flux, g_band_BJD_sector, g_band_flux_sector)
+slope,intercept,r_value = calibration(time,flux, g_band_BJD_sector, g_band_flux_sector)
+calibrated_data(slope,intercept,time,flux)
