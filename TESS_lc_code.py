@@ -12,6 +12,7 @@ from scipy.signal import find_peaks
 import lightkurve as lk
 from scipy.optimize import curve_fit
 from scipy.optimize import minimize
+import emcee
 
 
 def sector_data(index):
@@ -361,7 +362,8 @@ def phase_fold_binned(time, flux, peak_frequencies):
     plt.ylabel("Flux e/s")
     
     
-def multi_periodic_model(t, A1, f1, phi1, A2, f2, phi2, A3, f3, phi3,A4,f4,phi4,A5,f5,phi5, offset):
+def multi_periodic_model(t, params):
+    A1, f1, phi1, A2, f2, phi2, A3, f3, phi3, A4, f4, phi4, A5, f5, phi5, offset = params
     component1 = A1 * np.sin(2 * np.pi * f1 * t + phi1)  # Spin period
     component2 = A2 * np.sin(2 * np.pi * f2 * t + phi2)  # Orbital period
     component3 = A3 * np.sin(2 * np.pi * f3 * t + phi3)  # Beat frequency
@@ -376,25 +378,135 @@ def chi_squared(params, time, flux, flux_error):
     print(np.sum(((flux - model_flux) / flux_error) ** 2))
     return np.sum(((flux - model_flux) / flux_error) ** 2)
 
-def model_fit(time, flux, flux_error):
+def log_likelihood(params, time, flux, flux_error):
+    model_flux = multi_periodic_model(time, params)
+    chi_squared = np.sum(((flux - model_flux) / flux_error) ** 2)
+    return -0.5 * chi_squared
+
+def log_prior(params):
+    A1, f1, phi1, A2, f2, phi2, A3, f3, phi3, A4, f4, phi4, A5, f5, phi5, offset = params
+    if (
+        1 <= A1 <= 10
+        and 11.9 <= f1 <= 12.1
+        and 0 <= phi1 <= 2 * np.pi
+        and 2 <= A2 <= 10
+        and 1 <= f2 <= 7
+        and 0 <= phi2 <= 2 * np.pi
+        and 1 <= A3 <= 10
+        and 3.7 <= f3 <= 3.8
+        and 0 <= phi3 <= 2 * np.pi
+        and 0 <= A4 <= 10
+        and 4.5 <= f4 <= 4.7
+        and 0 <= phi4 <= 2 * np.pi
+        and 0 <= A5 <= 10
+        and 5.26 <= f5 <= 5.29
+        and 0 <= phi5 <= 2 * np.pi
+        and 0 <= offset <= 1250
+    ):
+        return 0.0  # log(1)
+    return -np.inf  # log(0)
+
+def log_probability(params, time, flux, flux_error):
+    lp = log_prior(params)
+    if not np.isfinite(lp):
+        return -np.inf
+    return lp + log_likelihood(params, time, flux, flux_error)
+
+def MCMC_Fit():
     start_time = 2797
-    end_time = 2804
+    end_time = 2797.8
     
     subset_indices = (time >= start_time) & (time <= end_time)
     time_subset = time[subset_indices]
     flux_subset = flux[subset_indices]
     flux_error_subset = flux_error[subset_indices]
+    # Initial setup for MCMC
+    num_params = 16
+    num_walkers = 32
+    num_steps = 10000
+    initial_guesses = [
+        1,  # A1
+        11.95,  # f1
+        np.pi,  # phi1
+                5,  # A2
+                10,  # f2
+                np.pi,  # phi2
+                3,  # A3
+                3.75,  # f3
+                0,  # phi3
+                3,  # A4
+                4.6,  # f4
+                np.pi,  # phi4
+                2,  # A5
+                5.27,  # f5
+                np.pi,  # phi5
+                1175  # offset
+                ]
     
-    print("time", time_subset)
-    print("flux", flux_subset)
+    # Initialize the walkers in a Gaussian ball around initial guesses
+    pos = initial_guesses + 1 * np.random.randn(num_walkers, num_params)
+    
+    # Set up the sampler
+    sampler = emcee.EnsembleSampler(num_walkers, num_params, log_probability, args=(time_subset, flux_subset, flux_error_subset))
+    
+    # Run MCMC
+    sampler.run_mcmc(pos, num_steps, progress=True)
+    
+    # Analyze the results
+    samples = sampler.get_chain(discard=100, thin=15, flat=True)
+    
+    # Plotting the results
+    import corner
+    fig = corner.corner(samples, labels=["A1", "f1", "phi1", "A2", "f2", "phi2", "A3", "f3", "phi3", "A4", "f4", "phi4", "A5", "f5", "phi5", "offset"])
+    plt.show()
+    
+    # Extract median values for each parameter
+    params_mcmc = np.median(samples, axis=0)
+    param_names = ["A1", "f1", "phi1", "A2", "f2", "phi2", "A3", "f3", "phi3", "A4", "f4", "phi4", "A5", "f5", "phi5", "offset"]
+    params_std = np.std(samples, axis=0)  # 1-sigma uncertainty
+    
+    # Print the results
+    print("Final parameter values and uncertainties:")
+    for i, name in enumerate(param_names):
+        print(f"{name}: {params_mcmc[i]:.4f} ± {params_std[i]:.4f}")
+        
+    
+    
+    # Plot the data with the best-fit model
+    fitted_flux = multi_periodic_model(time_subset, params_mcmc)
+    
+    chi_squared = np.sum(((flux_subset - fitted_flux) / flux_error_subset) ** 2)
+    reduced_chi_squared = chi_squared / (len(flux_subset) - len(params_mcmc))
+
+    print("Reduced Chi-squared:", reduced_chi_squared)
+    
+    plt.figure(figsize=(12, 6))
+    plt.scatter(time_subset,flux_subset, label = 'observed data', s=5,color = 'black')
+    plt.plot(time_subset,flux_subset,lw=1, color = 'blue')
+    plt.plot(time_subset, fitted_flux, label="MCMC Fit", color="red")
+    plt.xlabel("Time")
+    plt.ylabel("Flux")
+    plt.title("Multi-Periodic Model Fit with MCMC")
+    plt.legend()
+    plt.show()
+        
+def model_fit(time, flux, flux_error):
+    start_time = 2797
+    end_time = 2798
+    
+    subset_indices = (time >= start_time) & (time <= end_time)
+    time_subset = time[subset_indices]
+    flux_subset = flux[subset_indices]
+    flux_error_subset = flux_error[subset_indices]
+
 
     # Initial guesses for the parameters
     initial_guesses = [
     10,  # A1: Spin amplitude
     11.997,  # f1: Spin frequency
     -np.pi,    # phi1: Spin phase
-    0.5,   # A2: Orbital amplitude
-    6, # f2: Orbital frequency
+    1,   # A2: Orbital amplitude
+    1.8, # f2: Orbital frequency
     0,    # phi2: Orbital phase
     5,   # A3: Beat amplitude
     3.76, # f3: Beat frequency
@@ -412,19 +524,19 @@ def model_fit(time, flux, flux_error):
     bounds = [
     (4,10),      # Bounds for A1
     (11.9,12.1),         # Bounds for f1
-    (-np.pi, -np.pi), # Bounds for phi1
-    (1,2),      # Bounds for A2
-    (0,8),       # Bounds for f2
+    (-np.pi, np.pi), # Bounds for phi1
+    (0.5,2),      # Bounds for A2
+    (6.5,6.5),       # Bounds for f2
     (-np.pi, np.pi), # Bounds for phi2
     (2,5),       # Bounds for A3
     (3,8),       # Bounds for f3
-    (np.pi, np.pi),# Bounds for phi3
+    (-np.pi, np.pi),# Bounds for phi3
     (2,4),
     (4.5,4.7),
-    (-np.pi,-np.pi),
+    (-np.pi,np.pi),
     (1,3),
     (5.26,5.29),
-    (-np.pi,-np.pi),
+    (-np.pi,np.pi),
     (800, 1200)     # Bounds for offset
 ]
 
@@ -447,6 +559,7 @@ def model_fit(time, flux, flux_error):
     # Plot the fit
     plt.figure(figsize=(12, 6))
     plt.plot(time_subset, flux_subset, label='Observed Data', alpha=0.6)
+    plt.scatter(time_subset, flux_subset, s=5, color = 'black')
     plt.plot(time_subset, fitted_flux, label='Fitted Model', color='red')
     plt.xlabel("Time")
     plt.ylabel("Flux")
@@ -459,7 +572,7 @@ def model_fit(time, flux, flux_error):
 indexes = [0,1]
 multiple_LC_plot(indexes)
 times, fluxes, orbitals, spins, news = mulitple_sector_LS(indexes)
-peak_frequencies = np.array([3.7644049248055813,4.5835541627217085,5.2830523883579525])
+peak_frequencies = np.array([3.7644049248055813,4.5835541627217085,11.997])
 phase_fold_binned(times[0], fluxes[0], peak_frequencies)
 time,flux,exptime,flux_error = sector_data(indexes[1])
 print(time)
@@ -472,4 +585,5 @@ max_freq = 125  # Maximum frequency (cycles/day)
 
 # Call the function with your time, flux, and exptime data
 Lomb_Scargle_2D(time, flux, exptime, window_size, step_size, min_freq, max_freq)
-model_fit(time,flux,flux_error)
+#model_fit(time,flux,flux_error)
+MCMC_Fit()
