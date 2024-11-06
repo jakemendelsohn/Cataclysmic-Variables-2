@@ -390,7 +390,7 @@ def log_prior(params):
         and 11.9 <= f1 <= 12.1
         and 0 <= phi1 <= 2 * np.pi
         and 2 <= A2 <= 10
-        and 1 <= f2 <= 7
+        and 1.8 <= f2 <= 1.88
         and 0 <= phi2 <= 2 * np.pi
         and 1 <= A3 <= 10
         and 3.7 <= f3 <= 3.8
@@ -414,7 +414,7 @@ def log_probability(params, time, flux, flux_error):
 
 def MCMC_Fit():
     start_time = 2797
-    end_time = 2797.8
+    end_time = 2799
     
     subset_indices = (time >= start_time) & (time <= end_time)
     time_subset = time[subset_indices]
@@ -425,19 +425,19 @@ def MCMC_Fit():
     num_walkers = 32
     num_steps = 10000
     initial_guesses = [
-        1,  # A1
+        0.5,  # A1
         11.95,  # f1
-        np.pi,  # phi1
-                5,  # A2
-                10,  # f2
-                np.pi,  # phi2
-                3,  # A3
+        2*np.pi,  # phi1
+                0.5,  # A2
+                1.88,  # f2
+                2*np.pi,  # phi2
+                4,  # A3
                 3.75,  # f3
-                0,  # phi3
-                3,  # A4
+                np.pi,  # phi3
+                2,  # A4
                 4.6,  # f4
                 np.pi,  # phi4
-                2,  # A5
+                1,  # A5
                 5.27,  # f5
                 np.pi,  # phi5
                 1175  # offset
@@ -569,10 +569,10 @@ def model_fit(time, flux, flux_error):
 
     return params, result.hess_inv, fitted_flux, chi2, reduced_chi2
 
-indexes = [0,1]
+indexes = [1,2]
 multiple_LC_plot(indexes)
 times, fluxes, orbitals, spins, news = mulitple_sector_LS(indexes)
-peak_frequencies = np.array([3.7644049248055813,4.5835541627217085,11.997])
+peak_frequencies = np.array([0.678])
 phase_fold_binned(times[0], fluxes[0], peak_frequencies)
 time,flux,exptime,flux_error = sector_data(indexes[1])
 print(time)
@@ -586,4 +586,4 @@ max_freq = 125  # Maximum frequency (cycles/day)
 # Call the function with your time, flux, and exptime data
 Lomb_Scargle_2D(time, flux, exptime, window_size, step_size, min_freq, max_freq)
 #model_fit(time,flux,flux_error)
-MCMC_Fit()
+#MCMC_Fit()
