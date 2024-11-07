@@ -13,10 +13,11 @@ import lightkurve as lk
 from scipy.optimize import curve_fit
 from scipy.optimize import minimize
 import emcee
+from lightkurve import LightCurveCollection
 
 
 def sector_data(index):
-    search_result = lk.search_lightcurve('RX J2015.6+3711', mission='TESS')
+    search_result = lk.search_lightcurve('TIC 15853131', mission='TESS')
     print(search_result)
     lc = search_result[index].download()
     exptime = search_result.table['exptime'][index]
@@ -24,8 +25,6 @@ def sector_data(index):
     #sap_lc_cleaned = sap_lc.remove_nans()
     quality_flags = sap_lc.quality
     flagged_indices = np.where(quality_flags != 0)[0]
-    print(f"Data points with quality flags at indices: {flagged_indices}")
-    print(len(flagged_indices))
     good_quality_mask = quality_flags == 0  # Keeps only points with a quality flag of 0 (good data)
     
     time = sap_lc.time.value[good_quality_mask]
@@ -35,6 +34,40 @@ def sector_data(index):
     #time = sap_lc_cleaned.time.value
     #flux = sap_lc_cleaned.flux.value
     return time,flux,exptime,flux_error
+
+def stitch_flatten(indeces):
+    light_curves = []
+    times = []
+    fluxes = []
+    flux_errors = []
+    search_result = lk.search_lightcurve('TIC 15853131', mission='TESS')
+    for index in indeces:
+        lc = search_result[index].download()
+        processed_lc = lc.flatten(window_length=401).normalize()
+        sap_lc = processed_lc.SAP_FLUX
+        quality_flags = sap_lc.quality
+        flagged_indices = np.where(quality_flags != 0)[0]
+        good_quality_mask = quality_flags == 0
+        time = sap_lc.time.value[good_quality_mask]
+        flux = sap_lc.flux.value[good_quality_mask]
+        flux_error = sap_lc.flux_err.value[good_quality_mask]  
+        light_curves.append(sap_lc)
+        times.append(time)
+        fluxes.append(flux)
+        flux_errors.append(flux_errors)
+    lc_collection = LightCurveCollection(light_curves)
+    stitched_lc = lc_collection.stitch()
+    
+    quality_flags = sap_lc.quality
+    flagged_indices = np.where(quality_flags != 0)[0]
+    good_quality_mask = quality_flags == 0
+    
+    flux = stitched_lc.flux.value[good_quality_mask]
+    time = stitched_lc.time.value[good_quality_mask]
+    
+    plt.plot(time,flux,lw = 1)
+    plt.show()
+    
 
 def multiple_LC_plot(index_list):
     results = {}
@@ -60,7 +93,7 @@ def multiple_LC_plot(index_list):
     
     plt.xlabel('Time (MJD)')
     plt.ylabel('Flux (e/s)')
-    plt.title('DW Cnc Light Curve')
+    plt.title('Light Curve')
     plt.legend(loc='best', fontsize='small')  # Add a legend to identify sectors
     plt.show()
     
@@ -165,33 +198,37 @@ def mulitple_sector_LS(index_list):
     fig, (ax1, ax2) = plt.subplots(nrows=2, figsize=(10, 12), sharex=True)
     plt.subplots_adjust(hspace=0)  # hspace=0 removes the space between the subplot
     
-    ax1.set_xscale('log')
-    ax1.set_yscale('log')
-    ax2.set_xscale('log')
-    ax2.set_yscale('log')
+    #ax1.set_xscale('log')
+    #ax1.set_yscale('log')
+    ax1.set_xlim(10,30)
+    ax1.set_ylim(0,0.2)
+    #ax2.set_xscale('log')
+    #ax2.set_yscale('log')
+    ax2.set_xlim(10,30)
+    ax2.set_ylim(0,0.2)
     ax2.set_xlabel('Frequency (c/d)', fontsize = 14)
     fig.text(0, 0.5, 'Power x Frequency', va='center', rotation='vertical', fontsize=14)
     ax1.tick_params(axis='both', which='major', labelsize=14)
     ax2.tick_params(axis='both', which='major', labelsize=14)
     
     #Interesting_frequencies#
-    freq_int_manual1 = [3.7644049248055813,4.5835541627217085,5.2830523883579525,51.16461363568269]
-    freq_int_manual2 = [3.7644049248055813,4.5762621615,5.274733,51.164613]
+    freq_int_manual1 = [0.27,0.89,7.567,8.40575]
+    freq_int_manual2 = [0.27,0.89,6.68,8.40575]
     #freq_int_manual1 = [6.8267,22.4769, 81.1037,95.761]
     #freq_int_manual2 = [6.8267,22.4769, 81.1037,95.761]
     
     #AX1#
     ax1.plot(frequencies[0], powers[0]*frequencies[0], 'k', lw=1)
     y_vals = np.linspace(0,13,1000)
-    #for freq in orbitals[0]:
-       # x_vals = np.linspace(freq,freq,1000)
-       # ax1.plot(x_vals,y_vals,linestyle = ":", color = 'blue')
+    for freq in orbitals[0]:
+       x_vals = np.linspace(freq,freq,1000)
+       ax1.plot(x_vals,y_vals,linestyle = ":", color = 'blue')
     for freq1 in spins[0]:
       x_vals = np.linspace(freq1,freq1,1000)
       ax1.plot(x_vals,y_vals,linestyle = ":", color = 'red')
-   # for freq2 in beats[0]:
-       # x_vals = np.linspace(freq2,freq2,1000)
-       # ax1.plot(x_vals,y_vals,linestyle = ":", color = 'black')
+    for freq2 in beats[0]:
+      x_vals = np.linspace(freq2,freq2,1000)
+      ax1.plot(x_vals,y_vals,linestyle = ":", color = 'black')
     for freq3 in freq_int_manual1:
         x_vals = np.linspace(freq3,freq3,1000)
         ax1.plot(x_vals,y_vals,linestyle = ":", color = 'green')
@@ -201,15 +238,15 @@ def mulitple_sector_LS(index_list):
     #AX2#
     ax2.plot(frequencies[1], powers[1]*frequencies[1], 'k', lw=1)
     y_vals = np.linspace(0,13,1000)
-    #for freq in orbitals[1]:
-        #x_vals = np.linspace(freq,freq,1000)
-       # ax2.plot(x_vals,y_vals,linestyle = ":", color = 'blue')
-    #for freq1 in spins[1]:
-       #x_vals = np.linspace(freq1,freq1,1000)
-       #ax2.plot(x_vals,y_vals,linestyle = ":", color = 'red')
-   # for freq2 in beats[1]:
-       # x_vals = np.linspace(freq2,freq2,1000)
-      #  plt.plot(x_vals,y_vals,linestyle = ":", color = 'black')
+    for freq in orbitals[1]:
+        x_vals = np.linspace(freq,freq,1000)
+        ax2.plot(x_vals,y_vals,linestyle = ":", color = 'blue')
+    for freq1 in spins[1]:
+        x_vals = np.linspace(freq1,freq1,1000)
+        ax2.plot(x_vals,y_vals,linestyle = ":", color = 'red')
+    for freq2 in beats[1]:
+        x_vals = np.linspace(freq2,freq2,1000)
+        plt.plot(x_vals,y_vals,linestyle = ":", color = 'black')
     for freq3 in freq_int_manual2:
         x_vals = np.linspace(freq3,freq3,1000)
         ax2.plot(x_vals,y_vals,linestyle = ":", color = 'green')
@@ -274,7 +311,7 @@ def Lomb_Scargle_2D(time, flux, exptime, window_size, step_size, min_freq, max_f
     plt.title('2D Lomb-Scargle Power Spectrum')
     plt.show()
 
-def peak_finder(frequency, power,  height_threshold=0.0009, prominence=0.001):
+def peak_finder(frequency, power,  height_threshold=0.01, prominence=0.001):
     y = frequency*power
     peaks, properties = find_peaks(y, height=height_threshold, prominence=prominence)
     
@@ -284,10 +321,10 @@ def peak_finder(frequency, power,  height_threshold=0.0009, prominence=0.001):
     
     return peak_frequencies, peak_powers
 
-def peak_classification(frequency,power,peak_frequencies,peak_powers,tolerance = 0.002):
-    orbital_period = 0.5
+def peak_classification(frequency,power,peak_frequencies,peak_powers,tolerance = 0.005):
+    orbital_period = 0.131
     #orbital_period = 0.068233846
-    spin_period = 0.083351
+    spin_period = 0.1222
     natural_orbital_frequency = 1/orbital_period
     natural_spin_frequency = 1/spin_period
     natural_beat_frequency = abs(natural_spin_frequency-natural_orbital_frequency)
@@ -569,11 +606,15 @@ def model_fit(time, flux, flux_error):
 
     return params, result.hess_inv, fitted_flux, chi2, reduced_chi2
 
-indexes = [1,2]
-multiple_LC_plot(indexes)
-times, fluxes, orbitals, spins, news = mulitple_sector_LS(indexes)
-peak_frequencies = np.array([0.678])
-phase_fold_binned(times[0], fluxes[0], peak_frequencies)
+indexes = [0,1]
+indeces = [0,1,2,3]
+stitch_flatten(indeces)
+#multiple_LC_plot(indexes)
+#times, fluxes, orbitals, spins, news = mulitple_sector_LS(indexes)
+#peak_frequencies = np.array([0.27])
+#phase_fold_binned(times[0], fluxes[0], peak_frequencies)
+
+
 time,flux,exptime,flux_error = sector_data(indexes[1])
 print(time)
 #frequency,power,peak_frequencies,peak_powers = Lomb_Scargle(time,flux,exptime)
@@ -581,9 +622,9 @@ print(time)
 window_size = 0.3  # Window size in the same units as time (e.g., days or minutes)
 step_size = 5  # Step size for sliding the window
 min_freq = 5  # Minimum frequency (cycles/day)
-max_freq = 125  # Maximum frequency (cycles/day)
+max_freq = 40  # Maximum frequency (cycles/day)
 
 # Call the function with your time, flux, and exptime data
-Lomb_Scargle_2D(time, flux, exptime, window_size, step_size, min_freq, max_freq)
+#Lomb_Scargle_2D(time, flux, exptime, window_size, step_size, min_freq, max_freq)
 #model_fit(time,flux,flux_error)
 #MCMC_Fit()
