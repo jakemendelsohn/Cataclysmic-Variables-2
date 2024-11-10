@@ -14,6 +14,8 @@ from scipy.optimize import curve_fit
 from scipy.optimize import minimize
 import emcee
 from lightkurve import LightCurveCollection
+from astropy.io import fits
+from scipy.interpolate import interp1d
 
 
 def sector_data(index):
@@ -68,6 +70,38 @@ def stitch_flatten(indeces):
     plt.plot(time,flux,lw = 1)
     plt.show()
     
+def XMM_spec():
+    # Load the spectrum data file
+    with fits.open('C:/Users/jakem/OneDrive/Documents/Year 4 Project/XMM Data/GUEST18477658/3154/0782060201/PN/P0782060201PNS003SRSPEC0001.FTZ') as hdul:
+        data = hdul[1].data  # Adjust this index if necessary
+        channels = data['CHANNEL']
+        counts = data['COUNTS']
+        
+            
+    # Load the ARF file to get effective area (if available)
+    with fits.open('C:/Users/jakem/OneDrive/Documents/Year 4 Project/XMM Data/GUEST18477658/3154/0782060201/PN/P0782060201PNS003SRCARF0001.FTZ') as arf_hdul:
+        arf_data = arf_hdul[1].data
+        effective_area = arf_data['SPECRESP']  # Effective area for each energy bin
+        
+ 
+    energy_min = 0.2  # keV
+    energy_max = 10.0  # keV
+    energies = np.linspace(energy_min, energy_max, len(channels))
+
+    # Convert counts to flux: flux = counts / effective_area
+    # Ensure the lengths of `counts` and `effective_area` match
+    interp_func = interp1d(np.arange(len(effective_area)), effective_area, kind='linear', fill_value="extrapolate")
+    effective_area_resampled = interp_func(np.linspace(0, len(effective_area) - 1, len(counts)))
+    flux = counts / effective_area_resampled
+    
+    # Plotting the flux vs. energy spectrum
+    plt.figure(figsize=(10, 6))
+    plt.plot(energies, flux, drawstyle='steps-mid')
+    plt.xlabel('Energy (keV)')
+    plt.ylabel('Flux (photons/cm²/s/keV)')
+    plt.title('Flux vs Energy Spectrum')
+    plt.show()
+        
 
 def multiple_LC_plot(index_list):
     results = {}
@@ -608,7 +642,8 @@ def model_fit(time, flux, flux_error):
 
 indexes = [0,1]
 indeces = [0,1,2,3]
-stitch_flatten(indeces)
+#stitch_flatten(indeces)
+XMM_spec()
 #multiple_LC_plot(indexes)
 #times, fluxes, orbitals, spins, news = mulitple_sector_LS(indexes)
 #peak_frequencies = np.array([0.27])
