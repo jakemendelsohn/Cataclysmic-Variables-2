@@ -16,6 +16,10 @@ import emcee
 from lightkurve import LightCurveCollection
 from astropy.io import fits
 from scipy.interpolate import interp1d
+from ztfquery import lightcurve
+from astropy import time
+from ztfquery import query
+import pandas as pd
 
 
 def sector_data(index):
@@ -42,33 +46,43 @@ def stitch_flatten(indeces):
     times = []
     fluxes = []
     flux_errors = []
+    labels = ["sector 43", "sector 44", "sector 70", "sector 71"]   #adjust accordingly
     search_result = lk.search_lightcurve('TIC 15853131', mission='TESS')
-    for index in indeces:
+    for i, index in enumerate(indeces):
         lc = search_result[index].download()
-        processed_lc = lc.flatten(window_length=401).normalize()
+        processed_lc = lc.flatten()
+        processed_lc = processed_lc
         sap_lc = processed_lc.SAP_FLUX
         quality_flags = sap_lc.quality
         flagged_indices = np.where(quality_flags != 0)[0]
         good_quality_mask = quality_flags == 0
         time = sap_lc.time.value[good_quality_mask]
         flux = sap_lc.flux.value[good_quality_mask]
+        mean = np.mean(flux)
+        flux = flux/mean
         flux_error = sap_lc.flux_err.value[good_quality_mask]  
         light_curves.append(sap_lc)
         times.append(time)
         fluxes.append(flux)
         flux_errors.append(flux_errors)
+        plt.plot(time, flux,lw=1, label=labels[i])
+        plt.legend()
     lc_collection = LightCurveCollection(light_curves)
     stitched_lc = lc_collection.stitch()
     
-    quality_flags = sap_lc.quality
+    quality_flags = stitched_lc.quality
     flagged_indices = np.where(quality_flags != 0)[0]
     good_quality_mask = quality_flags == 0
     
-    flux = stitched_lc.flux.value[good_quality_mask]
-    time = stitched_lc.time.value[good_quality_mask]
-    
-    plt.plot(time,flux,lw = 1)
+    flux_stitched = stitched_lc.flux.value[good_quality_mask]
+    time_stitched = stitched_lc.time.value[good_quality_mask]
+    exptime_stitched = 120 #Adjust Accordingly
+    #plt.plot(time,flux,lw = 1)
+    plt.xlabel("Time (BJD-2457000, days)")
+    plt.ylabel("Normalised Flux")
     plt.show()
+    
+    return flux_stitched,time_stitched,exptime_stitched
     
 def XMM_spec():
     # Load the spectrum data file
@@ -101,8 +115,23 @@ def XMM_spec():
     plt.ylabel('Flux (photons/cm²/s/keV)')
     plt.title('Flux vs Energy Spectrum')
     plt.show()
-        
 
+def ZTF_data():
+    zquery = query.ZTFQuery()
+    lcq = lightcurve.LCQuery.from_position(197.501495, +75.721959, 5)
+    data = lcq.download_data()
+    lcq = lightcurve.LCQuery(data)
+    try:
+        data = lcq.download_data()
+        if data is not None:
+            print("Data downloaded successfully")
+            print(data)
+        else:
+            print("No data returned.")
+    except Exception as e:
+        print(f"An error occurred: {e}")
+    
+        
 def multiple_LC_plot(index_list):
     results = {}
 
@@ -157,10 +186,12 @@ def Lomb_Scargle(time,flux,exptime):
     plt.plot(frequency, power*frequency, 'k', lw=1)
     
     # Set logarithmic scale for frequency and power if needed
-    plt.xscale('log')
-    plt.yscale('log')
+    #plt.xscale('log')
+    #plt.yscale('log')
     #plt.yscale('linear')
     #plt.xscale('linear')
+    plt.xlim(0,5)
+    plt.ylim(0,0.05)
     
     # Set axis labels
     plt.xlabel('Frequency (c/d)')
@@ -642,8 +673,10 @@ def model_fit(time, flux, flux_error):
 
 indexes = [0,1]
 indeces = [0,1,2,3]
-#stitch_flatten(indeces)
-XMM_spec()
+flux_stitched, time_stitched, exptime_stitched = stitch_flatten(indeces)
+Lomb_Scargle(time_stitched, flux_stitched, exptime_stitched)
+#XMM_spec()
+#ZTF_data()
 #multiple_LC_plot(indexes)
 #times, fluxes, orbitals, spins, news = mulitple_sector_LS(indexes)
 #peak_frequencies = np.array([0.27])
