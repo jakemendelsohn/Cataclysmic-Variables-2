@@ -65,7 +65,7 @@ def stitch_flatten(indeces):
         times.append(time)
         fluxes.append(flux)
         flux_errors.append(flux_errors)
-        plt.plot(time, flux,lw=1, label=labels[i])
+        #plt.plot(time, flux,lw=1, label=labels[i])
         plt.legend()
     lc_collection = LightCurveCollection(light_curves)
     stitched_lc = lc_collection.stitch()
@@ -77,7 +77,7 @@ def stitch_flatten(indeces):
     flux_stitched = stitched_lc.flux.value[good_quality_mask]
     time_stitched = stitched_lc.time.value[good_quality_mask]
     exptime_stitched = 120 #Adjust Accordingly
-    #plt.plot(time,flux,lw = 1)
+    plt.plot(time_stitched,flux_stitched,lw = 1)
     plt.xlabel("Time (BJD-2457000, days)")
     plt.ylabel("Normalised Flux")
     plt.show()
@@ -190,7 +190,7 @@ def Lomb_Scargle(time,flux,exptime):
     #plt.yscale('log')
     #plt.yscale('linear')
     #plt.xscale('linear')
-    plt.xlim(0,5)
+    plt.xlim(12,34)
     plt.ylim(0,0.05)
     
     # Set axis labels
@@ -209,7 +209,7 @@ def Lomb_Scargle(time,flux,exptime):
         alrm = false_alarm(ls, power,frequency, freq2)
         #print("Freq", freq2, ":", alrm)
         
-    freq_int_manual2 = [16.56576]
+    freq_int_manual2 = [0.27,0.88,1.788,2.178,6.68,8.45,24.54,25.37,25.85]
     
     y_vals = np.linspace(0,13,1000)
     for freq in orbital_frequencies:
@@ -221,9 +221,10 @@ def Lomb_Scargle(time,flux,exptime):
     for freq2 in beat_frequencies:
         x_vals = np.linspace(freq2,freq2,1000)
         plt.plot(x_vals,y_vals,linestyle = ":", color = 'black')
+    for freq3 in freq_int_manual2:
+        x_vals = np.linspace(freq3,freq3,1000)
+        plt.plot(x_vals,y_vals,linestyle = ':', color = 'green')
     #print("The remaining frequency peaks are", remaining_frequencies)
-    x_values = np.linspace(22.47804849975284,22.47804849975284,1000)
-    plt.plot(x_values,y_vals,linestyle = ":", color = 'green')
     
     
     plt.plot([], [], linestyle=":", color='blue', label='Orbital Frequencies')  # Add one blue line to the legend
@@ -671,16 +672,16 @@ def model_fit(time, flux, flux_error):
 
     return params, result.hess_inv, fitted_flux, chi2, reduced_chi2
 
-indexes = [0,1]
+indexes = [2,3]
 indeces = [0,1,2,3]
 flux_stitched, time_stitched, exptime_stitched = stitch_flatten(indeces)
 Lomb_Scargle(time_stitched, flux_stitched, exptime_stitched)
 #XMM_spec()
 #ZTF_data()
 #multiple_LC_plot(indexes)
-#times, fluxes, orbitals, spins, news = mulitple_sector_LS(indexes)
-#peak_frequencies = np.array([0.27])
-#phase_fold_binned(times[0], fluxes[0], peak_frequencies)
+times, fluxes, orbitals, spins, news = mulitple_sector_LS(indexes)
+peak_frequencies = np.array([8.45])
+phase_fold_binned(times[0], fluxes[0], peak_frequencies)
 
 
 time,flux,exptime,flux_error = sector_data(indexes[1])
