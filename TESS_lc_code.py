@@ -680,7 +680,7 @@ Lomb_Scargle(time_stitched, flux_stitched, exptime_stitched)
 #ZTF_data()
 #multiple_LC_plot(indexes)
 times, fluxes, orbitals, spins, news = mulitple_sector_LS(indexes)
-peak_frequencies = np.array([8.45])
+peak_frequencies = np.array([7.633                                                                                ])
 phase_fold_binned(times[0], fluxes[0], peak_frequencies)
 
 
