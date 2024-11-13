@@ -241,8 +241,8 @@ def find_combinations(fundamentals, freqs, max_n=5, max_m=5):
 #g_band_BJD_sector, g_band_flux_sector = ASSASSN_data(time)
 #slope,intercept,r_value,slope2,intercept2,r_value2 = calibration(time,flux, g_band_BJD_sector, g_band_flux_sector)
 #calibrated_data(slope,intercept,slope2, intercept2,time,flux,g_band_BJD_sector,g_band_flux_sector)
-all_frequencies = [0.27,0.88,1.788,2.178,6.68,7.633,8.18,8.45,15.266,16.36,24.54,32.72,25.37,25.85]  # replace with your list of frequencies
-fundamental_frequencies = [0.27,0.88,7.633,8.18]
+all_frequencies = [0.27,0.88,1.788,2.178,6.68,7.633,8.18,8.45,15.266,15.74,16.36,24.54,32.72,25.37,25.85]  # replace with your list of frequencies
+fundamental_frequencies = [0.27,0.88,7.63,8.18]
 tolerance = 1e-2 # tolerance to account for measurement errors in matching harmonics
 # Find matched combinations in the original list
 matched_frequencies = find_combinations(fundamental_frequencies, all_frequencies)
