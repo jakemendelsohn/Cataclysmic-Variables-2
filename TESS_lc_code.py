@@ -1,43 +1,179 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Thu Oct 17 14:17:32 2024
-
-@author: jakem
-"""
-
 import matplotlib.pyplot as plt
 import numpy as np
 from astropy.timeseries import LombScargle
 from scipy.signal import find_peaks
 import lightkurve as lk
 from scipy.optimize import curve_fit
+from scipy.optimize import minimize
+import emcee
+from lightkurve import LightCurveCollection
+from astropy.io import fits
+from scipy.interpolate import interp1d
+from ztfquery import lightcurve
+from astropy import time
+from ztfquery import query
+import pandas as pd
 
 
 def sector_data(index):
-    search_result = lk.search_lightcurve('DW Cnc', mission='TESS')
+    search_result = lk.search_lightcurve('TIC 15853131', mission='TESS')
     print(search_result)
     lc = search_result[index].download()
     exptime = search_result.table['exptime'][index]
     sap_lc = lc.SAP_FLUX
     #sap_lc_cleaned = sap_lc.remove_nans()
-    sap_lc_cleaned = sap_lc.remove_outliers()
-    #sap_lc_cleaned2 = lc.remove_quality_flags()
-    #sap_lc_cleaned.plot()
-    #plt.show()
-    time = sap_lc_cleaned.time.value
-    #plt.figure(figsize=(12, 6))
-    flux = sap_lc_cleaned.flux.value
-    #periodogram = sap_lc_cleaned.to_periodogram(normalization='amplitude', minimum_frequency=10, maximum_frequency=1000)
-    #periodogram.plot()
-    #plt.show()
-    return time,flux,exptime
+    quality_flags = sap_lc.quality
+    flagged_indices = np.where(quality_flags != 0)[0]
+    good_quality_mask = quality_flags == 0  # Keeps only points with a quality flag of 0 (good data)
+    
+    time = sap_lc.time.value[good_quality_mask]
+    flux = sap_lc.flux.value[good_quality_mask]
+    flux_error = sap_lc.flux_err.value[good_quality_mask]  
+    #sap_lc_cleaned = sap_lc.remove_outliers()
+    #time = sap_lc_cleaned.time.value
+    #flux = sap_lc_cleaned.flux.value
+    return time,flux,exptime,flux_error
 
+def stitch_flatten(indeces):
+    light_curves = []
+    times = []
+    fluxes = []
+    flux_errors = []
+    labels = ["sector 43", "sector 44", "sector 70", "sector 71"]   #adjust accordingly
+    search_result = lk.search_lightcurve('TIC 15853131', mission='TESS')
+    for i, index in enumerate(indeces):
+        lc = search_result[index].download()
+        processed_lc = lc.flatten()
+        processed_lc = processed_lc
+        sap_lc = processed_lc.SAP_FLUX
+        quality_flags = sap_lc.quality
+        flagged_indices = np.where(quality_flags != 0)[0]
+        good_quality_mask = quality_flags == 0
+        time = sap_lc.time.value[good_quality_mask]
+        flux = sap_lc.flux.value[good_quality_mask]
+        mean = np.mean(flux)
+        flux = flux/mean
+        flux_error = sap_lc.flux_err.value[good_quality_mask]  
+        light_curves.append(sap_lc)
+        times.append(time)
+        fluxes.append(flux)
+        flux_errors.append(flux_errors)
+        #plt.plot(time, flux,lw=1, label=labels[i])
+        plt.legend()
+    lc_collection = LightCurveCollection(light_curves)
+    stitched_lc = lc_collection.stitch()
+    
+    quality_flags = stitched_lc.quality
+    flagged_indices = np.where(quality_flags != 0)[0]
+    good_quality_mask = quality_flags == 0
+    
+    flux_stitched = stitched_lc.flux.value[good_quality_mask]
+    time_stitched = stitched_lc.time.value[good_quality_mask]
+    exptime_stitched = 120 #Adjust Accordingly
+    plt.plot(time_stitched,flux_stitched,lw = 1)
+    plt.xlabel("Time (BJD-2457000, days)")
+    plt.ylabel("Normalised Flux")
+    plt.show()
+    
+    return flux_stitched,time_stitched,exptime_stitched
+    
+def XMM_spec():
+    # Load the spectrum data file
+    with fits.open('C:/Users/jakem/OneDrive/Documents/Year 4 Project/XMM Data/GUEST18477658/3154/0782060201/PN/P0782060201PNS003SRSPEC0001.FTZ') as hdul:
+        data = hdul[1].data  # Adjust this index if necessary
+        channels = data['CHANNEL']
+        counts = data['COUNTS']
+        
+            
+    # Load the ARF file to get effective area (if available)
+    with fits.open('C:/Users/jakem/OneDrive/Documents/Year 4 Project/XMM Data/GUEST18477658/3154/0782060201/PN/P0782060201PNS003SRCARF0001.FTZ') as arf_hdul:
+        arf_data = arf_hdul[1].data
+        effective_area = arf_data['SPECRESP']  # Effective area for each energy bin
+        
+ 
+    energy_min = 0.2  # keV
+    energy_max = 10.0  # keV
+    energies = np.linspace(energy_min, energy_max, len(channels))
+
+    # Convert counts to flux: flux = counts / effective_area
+    # Ensure the lengths of `counts` and `effective_area` match
+    interp_func = interp1d(np.arange(len(effective_area)), effective_area, kind='linear', fill_value="extrapolate")
+    effective_area_resampled = interp_func(np.linspace(0, len(effective_area) - 1, len(counts)))
+    flux = counts / effective_area_resampled
+    
+    # Plotting the flux vs. energy spectrum
+    plt.figure(figsize=(10, 6))
+    plt.plot(energies, flux, drawstyle='steps-mid')
+    plt.xlabel('Energy (keV)')
+    plt.ylabel('Flux (photons/cm²/s/keV)')
+    plt.title('Flux vs Energy Spectrum')
+    plt.show()
+
+def XMM_test():
+    file_paths = [
+    'C:/Users/jakem/OneDrive/Documents/Year 4 Project/XMM Data/GUEST18477658/3154/0782060201/PN/P0782060201PNS003SRCTSR8001.FTZ',
+    'C:/Users/jakem/OneDrive/Documents/Year 4 Project/XMM Data/GUEST18477658/3154/0782060201/PN/P0782060201PNS003SRCTSR8002.FTZ',
+    'C:/Users/jakem/OneDrive/Documents/Year 4 Project/XMM Data/GUEST18477658/3154/0782060201/PN/P0782060201PNS003SRCTSR8003.FTZ',
+    'C:/Users/jakem/OneDrive/Documents/Year 4 Project/XMM Data/GUEST18477658/3154/0782060201/PN/P0782060201PNS003SRCTSR8004.FTZ']
+    fig, axs = plt.subplots(2, 2, figsize=(10, 8))
+    fig.suptitle('XMM Time Series for Multiple Files')
+    colors = ['blue', 'green', 'red', 'purple']
+    for i, file_path in enumerate(file_paths):
+        with fits.open(file_path) as hdul:
+            spectrum_data = hdul[1].data
+            time = spectrum_data['TIME']
+            rate = spectrum_data['RATE']
+            backv = spectrum_data['BACKV']  # Background rate
+
+            # Calculate background-subtracted rate
+            net_rate = rate - backv
+
+            # Determine subplot position
+            ax = axs[i // 2, i % 2]
+            ax.plot(time, net_rate, color=colors[i],lw=1)
+            ax.set_xlabel('Time (s)')
+            ax.set_ylabel('Net Rate (c/s)')
+            ax.set_title(f'Camera {i+1}')
+            ax.set_ylim(0, 3)  # Adjust if needed for better visualization
+
+    # Adjust layout
+    plt.tight_layout(rect=[0, 0, 1, 0.96])  # Leave space for the main title
+    plt.show()
+     
+def ZTF_data():
+    zquery = query.ZTFQuery()
+    lcq = lightcurve.LCQuery.from_position(197.501495, +75.721959, 5)
+    ZTF_data = pd.DataFrame({'JD' : lcq.data.mjd+2400000.5, 'Magnitude' : lcq.data.mag, 'Magnitude_Error' : lcq.data.magerr, "Filter" : lcq.data.filtercode})
+    #data = lcq.download_data()
+    #lcq = lightcurve.LCQuery(data)
+    df = ZTF_data
+    filter_list = ["zg", "zr", "zi"]
+    colour = ["teal", "red", "black"]
+    for filter, colour in zip(filter_list, colour):     
+        plt.scatter(df.JD[df.Filter == filter]-2400000.5, df.Magnitude[df.Filter == filter], color=colour, label=filter,s=1)
+    plt.gca().invert_yaxis()
+    plt.legend() 
+    plt.xlabel("Time, BJD")
+    plt.ylabel("Magnitude")
+    plt.title("ZTF light Curves in Different Bands")
+    plt.show()
+    try:
+        data = lcq.download_data()
+        if data is not None:
+            print("Data downloaded successfully")
+            print(data)
+        else:
+            print("No data returned.")
+    except Exception as e:
+        print(f"An error occurred: {e}")
+    
+        
 def multiple_LC_plot(index_list):
     results = {}
 
     # Iterate over the index list and call the original function
     for idx in index_list:
-        time, flux, exptime = sector_data(idx)
+        time, flux, exptime,flux_error = sector_data(idx)
         
         # Storing the 3 results as a tuple in a dictionary for easy access
         results[f"var_{idx}_1_2_3"] = (time, flux, exptime)
@@ -56,7 +192,7 @@ def multiple_LC_plot(index_list):
     
     plt.xlabel('Time (MJD)')
     plt.ylabel('Flux (e/s)')
-    plt.title('DW Cnc Light Curve')
+    plt.title('Light Curve')
     plt.legend(loc='best', fontsize='small')  # Add a legend to identify sectors
     plt.show()
     
@@ -78,7 +214,7 @@ def Lomb_Scargle(time,flux,exptime):
     min_freq, max_freq = frequency_range(time,flux,exptime)
     # Compute the Lomb-Scargle Periodogram within the specified frequency range
     num_frequency_points = 100000  # You can adjust this based on the desired resolution
-    frequency = np.linspace(min_freq, max_freq/5, num_frequency_points)
+    frequency = np.linspace(min_freq, max_freq, num_frequency_points)
     ls = LombScargle(time, flux)
     power = ls.power(frequency,normalization = 'model')# Manually compute power without autopower
     # Plot the Lomb-Scargle Periodogram
@@ -86,10 +222,12 @@ def Lomb_Scargle(time,flux,exptime):
     plt.plot(frequency, power*frequency, 'k', lw=1)
     
     # Set logarithmic scale for frequency and power if needed
-    plt.xscale('log')
-    plt.yscale('log')
+    #plt.xscale('log')
+    #plt.yscale('log')
     #plt.yscale('linear')
     #plt.xscale('linear')
+    plt.xlim(12,34)
+    plt.ylim(0,0.05)
     
     # Set axis labels
     plt.xlabel('Frequency (c/d)')
@@ -107,7 +245,7 @@ def Lomb_Scargle(time,flux,exptime):
         alrm = false_alarm(ls, power,frequency, freq2)
         #print("Freq", freq2, ":", alrm)
         
-    freq_int_manual2 = [16.56576]
+    freq_int_manual2 = [0.27,0.88,1.788,2.178,6.68,8.45,24.54,25.37,25.85]
     
     y_vals = np.linspace(0,13,1000)
     for freq in orbital_frequencies:
@@ -119,9 +257,10 @@ def Lomb_Scargle(time,flux,exptime):
     for freq2 in beat_frequencies:
         x_vals = np.linspace(freq2,freq2,1000)
         plt.plot(x_vals,y_vals,linestyle = ":", color = 'black')
+    for freq3 in freq_int_manual2:
+        x_vals = np.linspace(freq3,freq3,1000)
+        plt.plot(x_vals,y_vals,linestyle = ':', color = 'green')
     #print("The remaining frequency peaks are", remaining_frequencies)
-    x_values = np.linspace(22.47804849975284,22.47804849975284,1000)
-    plt.plot(x_values,y_vals,linestyle = ":", color = 'green')
     
     
     plt.plot([], [], linestyle=":", color='blue', label='Orbital Frequencies')  # Add one blue line to the legend
@@ -138,10 +277,10 @@ def mulitple_sector_LS(index_list):
 
     # Iterate over the index list and call the original function
     for idx in index_list:
-        time, flux, exptime = sector_data(idx)
+        time, flux, exptime,flux_error = sector_data(idx)
         
         # Storing the 3 results as a tuple in a dictionary for easy access
-        results[f"var_{idx}_1_2_3"] = (time, flux, exptime)
+        results[f"var_{idx}_1_2_3"] = (time, flux, exptime,flux_error)
     times = [value[0] for value in results.values()]
     fluxes = [value[1] for value in results.values()]
     exptimes = [value[2] for value in results.values()]
@@ -161,18 +300,22 @@ def mulitple_sector_LS(index_list):
     fig, (ax1, ax2) = plt.subplots(nrows=2, figsize=(10, 12), sharex=True)
     plt.subplots_adjust(hspace=0)  # hspace=0 removes the space between the subplot
     
-    ax1.set_xscale('log')
-    ax1.set_yscale('log')
-    ax2.set_xscale('log')
-    ax2.set_yscale('log')
+    #ax1.set_xscale('log')
+    #ax1.set_yscale('log')
+    ax1.set_xlim(10,30)
+    ax1.set_ylim(0,0.2)
+    #ax2.set_xscale('log')
+    #ax2.set_yscale('log')
+    ax2.set_xlim(10,30)
+    ax2.set_ylim(0,0.2)
     ax2.set_xlabel('Frequency (c/d)', fontsize = 14)
     fig.text(0, 0.5, 'Power x Frequency', va='center', rotation='vertical', fontsize=14)
     ax1.tick_params(axis='both', which='major', labelsize=14)
     ax2.tick_params(axis='both', which='major', labelsize=14)
     
     #Interesting_frequencies#
-    freq_int_manual1 = [3.671158,10.44262,13.2575,30.1763]
-    freq_int_manual2 = [3.671158,10.44262,13.2575,30.1763]
+    freq_int_manual1 = [0.27,0.89,7.567,8.40575]
+    freq_int_manual2 = [0.27,0.89,6.68,8.40575]
     #freq_int_manual1 = [6.8267,22.4769, 81.1037,95.761]
     #freq_int_manual2 = [6.8267,22.4769, 81.1037,95.761]
     
@@ -180,14 +323,14 @@ def mulitple_sector_LS(index_list):
     ax1.plot(frequencies[0], powers[0]*frequencies[0], 'k', lw=1)
     y_vals = np.linspace(0,13,1000)
     for freq in orbitals[0]:
-        x_vals = np.linspace(freq,freq,1000)
-        ax1.plot(x_vals,y_vals,linestyle = ":", color = 'blue')
+       x_vals = np.linspace(freq,freq,1000)
+       ax1.plot(x_vals,y_vals,linestyle = ":", color = 'blue')
     for freq1 in spins[0]:
-        x_vals = np.linspace(freq1,freq1,1000)
-        ax1.plot(x_vals,y_vals,linestyle = ":", color = 'red')
+      x_vals = np.linspace(freq1,freq1,1000)
+      ax1.plot(x_vals,y_vals,linestyle = ":", color = 'red')
     for freq2 in beats[0]:
-        x_vals = np.linspace(freq2,freq2,1000)
-        ax1.plot(x_vals,y_vals,linestyle = ":", color = 'black')
+      x_vals = np.linspace(freq2,freq2,1000)
+      ax1.plot(x_vals,y_vals,linestyle = ":", color = 'black')
     for freq3 in freq_int_manual1:
         x_vals = np.linspace(freq3,freq3,1000)
         ax1.plot(x_vals,y_vals,linestyle = ":", color = 'green')
@@ -270,7 +413,7 @@ def Lomb_Scargle_2D(time, flux, exptime, window_size, step_size, min_freq, max_f
     plt.title('2D Lomb-Scargle Power Spectrum')
     plt.show()
 
-def peak_finder(frequency, power,  height_threshold=0.02, prominence=0.001):
+def peak_finder(frequency, power,  height_threshold=0.01, prominence=0.001):
     y = frequency*power
     peaks, properties = find_peaks(y, height=height_threshold, prominence=prominence)
     
@@ -280,10 +423,10 @@ def peak_finder(frequency, power,  height_threshold=0.02, prominence=0.001):
     
     return peak_frequencies, peak_powers
 
-def peak_classification(frequency,power,peak_frequencies,peak_powers,tolerance = 0.002):
-    orbital_period = 0.05979267
+def peak_classification(frequency,power,peak_frequencies,peak_powers,tolerance = 0.005):
+    orbital_period = 0.131
     #orbital_period = 0.068233846
-    spin_period = 0.02679429
+    spin_period = 0.1222
     natural_orbital_frequency = 1/orbital_period
     natural_spin_frequency = 1/spin_period
     natural_beat_frequency = abs(natural_spin_frequency-natural_orbital_frequency)
@@ -358,63 +501,236 @@ def phase_fold_binned(time, flux, peak_frequencies):
     plt.ylabel("Flux e/s")
     
     
-def multi_periodic_model(t, A1, f1, phi1, A2, f2, phi2, A3, f3, phi3, offset):
-    """Model with three sinusoidal components plus an offset"""
+def multi_periodic_model(t, params):
+    A1, f1, phi1, A2, f2, phi2, A3, f3, phi3, A4, f4, phi4, A5, f5, phi5, offset = params
     component1 = A1 * np.sin(2 * np.pi * f1 * t + phi1)  # Spin period
     component2 = A2 * np.sin(2 * np.pi * f2 * t + phi2)  # Orbital period
     component3 = A3 * np.sin(2 * np.pi * f3 * t + phi3)  # Beat frequency
-    return component1 + component2 + component3 + offset
+    component4 = A4 * np.sin(2* np.pi * f4 * t + phi4)
+    component5 = A5 * np.sin(2* np.pi * f5 * t + phi5)
+    return component1 + component2 + component3 + component4 +  offset
 
-def model_fit(time,flux):
+def chi_squared(params, time, flux, flux_error):
+    """Chi-squared calculation for the model."""
+    A1, f1, phi1, A2, f2, phi2, A3, f3, phi3,A4,f4,phi4,A5,f5,phi5, offset = params
+    model_flux = multi_periodic_model(time, A1, f1, phi1, A2, f2, phi2, A3, f3, phi3,A4,f4,phi4,A5,f5,phi5, offset)
+    print(np.sum(((flux - model_flux) / flux_error) ** 2))
+    return np.sum(((flux - model_flux) / flux_error) ** 2)
+
+def log_likelihood(params, time, flux, flux_error):
+    model_flux = multi_periodic_model(time, params)
+    chi_squared = np.sum(((flux - model_flux) / flux_error) ** 2)
+    return -0.5 * chi_squared
+
+def log_prior(params):
+    A1, f1, phi1, A2, f2, phi2, A3, f3, phi3, A4, f4, phi4, A5, f5, phi5, offset = params
+    if (
+        1 <= A1 <= 10
+        and 11.9 <= f1 <= 12.1
+        and 0 <= phi1 <= 2 * np.pi
+        and 2 <= A2 <= 10
+        and 1.8 <= f2 <= 1.88
+        and 0 <= phi2 <= 2 * np.pi
+        and 1 <= A3 <= 10
+        and 3.7 <= f3 <= 3.8
+        and 0 <= phi3 <= 2 * np.pi
+        and 0 <= A4 <= 10
+        and 4.5 <= f4 <= 4.7
+        and 0 <= phi4 <= 2 * np.pi
+        and 0 <= A5 <= 10
+        and 5.26 <= f5 <= 5.29
+        and 0 <= phi5 <= 2 * np.pi
+        and 18 <= offset <= 21
+    ):
+        return 0.0  # log(1)
+    return -np.inf  # log(0)
+
+def log_probability(params, time, flux, flux_error):
+    lp = log_prior(params)
+    if not np.isfinite(lp):
+        return -np.inf
+    return lp + log_likelihood(params, time, flux, flux_error)
+
+def MCMC_Fit(time,flux,flux_error):
+    start_time = 2475
+    end_time = 2478
     
-    start_time = 3262
-    end_time = 3266
-
     subset_indices = (time >= start_time) & (time <= end_time)
     time_subset = time[subset_indices]
     flux_subset = flux[subset_indices]
-    
+    flux_error_subset = flux_error[subset_indices]
+    # Initial setup for MCMC
+    num_params = 16
+    num_walkers = 32
+    num_steps = 10000
     initial_guesses = [
-    12,  # A1: Spin amplitude
-    37.26, # f1: Spin frequency 
-    0,    # phi1: Spin phase 
-    12,  # A2: Orbital amplitude 
-    16.7, # f2: Orbital frequency 
-    0,    # phi2: Orbital phase 
-    12,  # A3: Beat amplitude 
-    20.60, # f3: Beat frequency 
-    0,    # phi3
-    150   # offset
-]
-    params, covariance = curve_fit(multi_periodic_model, time_subset, flux_subset, p0=initial_guesses,bounds=([10, 37, -np.pi,10, 16, -np.pi, 10, 20, -np.pi, 140],
-            [25, 38, np.pi, 25, 17, np.pi, 25, 21, np.pi, 160]))
-    A1, f1, phi1, A2, f2, phi2, A3, f3, phi3, offset = params
-    print(params)
-    fitted_flux = multi_periodic_model(time_subset, *params)
-    plt.figure(figsize=(10, 6))
-    plt.plot(time_subset, flux_subset, label='Observed Data', alpha=0.6)
-    plt.plot(time_subset, fitted_flux, label='Fitted Model', color='red')
-    plt.xlabel('Time')
-    plt.ylabel('Flux')
-    plt.legend()
-    plt.title('Multi-Periodic Model Fit')
+        0.5,  # A1
+        11.95,  # f1
+        2*np.pi,  # phi1
+                0.5,  # A2
+                1.88,  # f2
+                2*np.pi,  # phi2
+                4,  # A3
+                3.75,  # f3
+                np.pi,  # phi3
+                2,  # A4
+                4.6,  # f4
+                np.pi,  # phi4
+                1,  # A5
+                5.27,  # f5
+                np.pi,  # phi5
+                20 # offset
+                ]
+    
+    # Initialize the walkers in a Gaussian ball around initial guesses
+    pos = initial_guesses + 1 * np.random.randn(num_walkers, num_params)
+    
+    # Set up the sampler
+    sampler = emcee.EnsembleSampler(num_walkers, num_params, log_probability, args=(time_subset, flux_subset, flux_error_subset))
+    
+    # Run MCMC
+    sampler.run_mcmc(pos, num_steps, progress=True)
+    
+    # Analyze the results
+    samples = sampler.get_chain(discard=100, thin=15, flat=True)
+    
+    # Plotting the results
+    import corner
+    fig = corner.corner(samples, labels=["A1", "f1", "phi1", "A2", "f2", "phi2", "A3", "f3", "phi3", "A4", "f4", "phi4", "A5", "f5", "phi5", "offset"])
     plt.show()
     
-    return params,covariance,fitted_flux
+    # Extract median values for each parameter
+    params_mcmc = np.median(samples, axis=0)
+    param_names = ["A1", "f1", "phi1", "A2", "f2", "phi2", "A3", "f3", "phi3", "A4", "f4", "phi4", "A5", "f5", "phi5", "offset"]
+    params_std = np.std(samples, axis=0)  # 1-sigma uncertainty
+    
+    # Print the results
+    print("Final parameter values and uncertainties:")
+    for i, name in enumerate(param_names):
+        print(f"{name}: {params_mcmc[i]:.4f} ± {params_std[i]:.4f}")
+        
+    
+    
+    # Plot the data with the best-fit model
+    fitted_flux = multi_periodic_model(time_subset, params_mcmc)
+    
+    chi_squared = np.sum(((flux_subset - fitted_flux) / flux_error_subset) ** 2)
+    reduced_chi_squared = chi_squared / (len(flux_subset) - len(params_mcmc))
 
-indexes = [3,4]
-multiple_LC_plot(indexes)
-times, fluxes, orbitals, spins, news = mulitple_sector_LS(indexes)
-peak_frequencies = np.array([37.264,33.445,20.602])
-phase_fold_binned(times[0], fluxes[0], peak_frequencies)
-time,flux,exptime = sector_data(indexes[1])
+    print("Reduced Chi-squared:", reduced_chi_squared)
+    
+    plt.figure(figsize=(12, 6))
+    plt.scatter(time_subset,flux_subset, label = 'observed data', s=5,color = 'black')
+    plt.plot(time_subset,flux_subset,lw=1, color = 'blue')
+    plt.plot(time_subset, fitted_flux, label="MCMC Fit", color="red")
+    plt.xlabel("Time")
+    plt.ylabel("Flux")
+    plt.title("Multi-Periodic Model Fit with MCMC")
+    plt.legend()
+    plt.show()
+        
+def model_fit(time, flux, flux_error):
+    start_time = 2797
+    end_time = 2798
+    
+    subset_indices = (time >= start_time) & (time <= end_time)
+    time_subset = time[subset_indices]
+    flux_subset = flux[subset_indices]
+    flux_error_subset = flux_error[subset_indices]
+
+
+    # Initial guesses for the parameters
+    initial_guesses = [
+    10,  # A1: Spin amplitude
+    11.997,  # f1: Spin frequency
+    -np.pi,    # phi1: Spin phase
+    1,   # A2: Orbital amplitude
+    1.8, # f2: Orbital frequency
+    0,    # phi2: Orbital phase
+    5,   # A3: Beat amplitude
+    3.76, # f3: Beat frequency
+    np.pi,    # phi3: Beat phase
+    3, #A4
+    4.58, #f4
+    -np.pi, #phi4
+    2, #A5
+    5.28, #f5
+    -np.pi, #phi5
+    1000  # Offset
+]
+
+    # Bounds for the parameters
+    bounds = [
+    (4,10),      # Bounds for A1
+    (11.9,12.1),         # Bounds for f1
+    (-np.pi, np.pi), # Bounds for phi1
+    (0.5,2),      # Bounds for A2
+    (6.5,6.5),       # Bounds for f2
+    (-np.pi, np.pi), # Bounds for phi2
+    (2,5),       # Bounds for A3
+    (3,8),       # Bounds for f3
+    (-np.pi, np.pi),# Bounds for phi3
+    (2,4),
+    (4.5,4.7),
+    (-np.pi,np.pi),
+    (1,3),
+    (5.26,5.29),
+    (-np.pi,np.pi),
+    (800, 1200)     # Bounds for offset
+]
+
+    # Minimize the chi-squared function
+    result = minimize(
+        chi_squared, initial_guesses, args=(time_subset, flux_subset, flux_error_subset),
+        bounds=bounds
+    )
+
+    # Extract the fitted parameters
+    params = result.x
+    fitted_flux = multi_periodic_model(time_subset, *params)
+    chi2 = chi_squared(params, time_subset, flux_subset, flux_error_subset)
+    reduced_chi2 = chi2 / (len(flux_subset) - len(params))  # Reduced chi-squared
+
+    print("Parameters:", params)
+    print("Chi-squared:", chi2)
+    print("Reduced Chi-squared:", reduced_chi2)
+
+    # Plot the fit
+    plt.figure(figsize=(12, 6))
+    plt.plot(time_subset, flux_subset, label='Observed Data', alpha=0.6)
+    plt.scatter(time_subset, flux_subset, s=5, color = 'black')
+    plt.plot(time_subset, fitted_flux, label='Fitted Model', color='red')
+    plt.xlabel("Time")
+    plt.ylabel("Flux")
+    plt.legend()
+    plt.title("Multi-Periodic Model Fit with Chi-squared Minimization")
+    plt.show()
+
+    return params, result.hess_inv, fitted_flux, chi2, reduced_chi2
+
+indexes = [0,1]
+indeces = [0,1,2,3]
+#flux_stitched, time_stitched, exptime_stitched = stitch_flatten(indeces)
+#Lomb_Scargle(time_stitched, flux_stitched, exptime_stitched)
+#XMM_spec()
+#XMM_test()
+ZTF_data()
+#multiple_LC_plot(indexes)
+#times, fluxes, orbitals, spins, news = mulitple_sector_LS(indexes)
+#peak_frequencies = np.array([7.633                                                                                ])
+#phase_fold_binned(times[0], fluxes[0], peak_frequencies)
+
+
+time,flux,exptime,flux_error = sector_data(indexes[0])
+print(time)
 #frequency,power,peak_frequencies,peak_powers = Lomb_Scargle(time,flux,exptime)
 #peak_classification(frequency,power,peak_frequencies,peak_powers)
 window_size = 0.3  # Window size in the same units as time (e.g., days or minutes)
 step_size = 5  # Step size for sliding the window
 min_freq = 5  # Minimum frequency (cycles/day)
-max_freq = 125  # Maximum frequency (cycles/day)
+max_freq = 40  # Maximum frequency (cycles/day)
 
 # Call the function with your time, flux, and exptime data
-Lomb_Scargle_2D(time, flux, exptime, window_size, step_size, min_freq, max_freq)
-model_fit(time,flux)
+#Lomb_Scargle_2D(time, flux, exptime, window_size, step_size, min_freq, max_freq)
+#model_fit(time,flux,flux_error)
+#MCMC_Fit(time,flux,flux_error)
