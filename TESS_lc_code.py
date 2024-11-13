@@ -34,6 +34,30 @@ def sector_data(index):
     #flux = sap_lc_cleaned.flux.value
     return time,flux,exptime,flux_error
 
+def Kepler_data(index):
+    search_result = lk.search_lightcurve("04:07:00.919 +18:49:35.79")
+    print(search_result)
+    lc = search_result[index].download()
+    exptime = search_result.table['exptime'][index]
+    sap_lc = lc.SAP_FLUX
+    quality_flags = sap_lc.quality
+    flagged_indices = np.where(quality_flags != 0)[0]
+    good_quality_mask = quality_flags == 0  # Keeps only points with a quality flag of 0 (good data)
+    
+    time = sap_lc.time.value[good_quality_mask]
+    flux = sap_lc.flux.value[good_quality_mask]
+    print("flux", flux)
+    flux_error = sap_lc.flux_err.value[good_quality_mask]  
+    plt.figure(figsize = (8,4))
+    plt.plot(time,flux,lw=1)
+    plt.xlabel("BKJD (days)")
+    plt.ylabel("Flux (e/s)")
+    plt.title("Kepler K2 Lightcurve")
+    #sap_lc_cleaned = sap_lc.remove_outliers()
+    #time = sap_lc_cleaned.time.value
+    #flux = sap_lc_cleaned.flux.value
+    return time,flux,exptime,flux_error
+
 def stitch_flatten(indeces):
     light_curves = []
     times = []
@@ -142,7 +166,7 @@ def XMM_test():
      
 def ZTF_data():
     zquery = query.ZTFQuery()
-    lcq = lightcurve.LCQuery.from_position(197.501495, +75.721959, 5)
+    lcq = lightcurve.LCQuery.from_position(61.7666727, +18.9272377, 5)
     ZTF_data = pd.DataFrame({'JD' : lcq.data.mjd+2400000.5, 'Magnitude' : lcq.data.mag, 'Magnitude_Error' : lcq.data.magerr, "Filter" : lcq.data.filtercode})
     #data = lcq.download_data()
     #lcq = lightcurve.LCQuery(data)
@@ -216,7 +240,8 @@ def Lomb_Scargle(time,flux,exptime):
     num_frequency_points = 100000  # You can adjust this based on the desired resolution
     frequency = np.linspace(min_freq, max_freq, num_frequency_points)
     ls = LombScargle(time, flux)
-    power = ls.power(frequency,normalization = 'model')# Manually compute power without autopower
+    power = ls.power(frequency,normalization = "model")# Manually compute power without autopower
+    print(power)
     # Plot the Lomb-Scargle Periodogram
     plt.figure(figsize=(10, 6))
     plt.plot(frequency, power*frequency, 'k', lw=1)
@@ -226,8 +251,8 @@ def Lomb_Scargle(time,flux,exptime):
     #plt.yscale('log')
     #plt.yscale('linear')
     #plt.xscale('linear')
-    plt.xlim(12,34)
-    plt.ylim(0,0.05)
+    #plt.xlim(5,9)
+    plt.ylim(0,0.1)
     
     # Set axis labels
     plt.xlabel('Frequency (c/d)')
@@ -245,7 +270,8 @@ def Lomb_Scargle(time,flux,exptime):
         alrm = false_alarm(ls, power,frequency, freq2)
         #print("Freq", freq2, ":", alrm)
         
-    freq_int_manual2 = [0.27,0.88,1.788,2.178,6.68,8.45,24.54,25.37,25.85]
+    #freq_int_manual2 = [0.27,0.88,1.788,2.178,6.68,8.45,24.54,25.37,25.85]
+    freq_int_manual2 = [2.43,4.08,6.51,7.663,12.23,16.31,20.38]
     
     y_vals = np.linspace(0,13,1000)
     for freq in orbital_frequencies:
@@ -712,16 +738,21 @@ indexes = [0,1]
 indeces = [0,1,2,3]
 #flux_stitched, time_stitched, exptime_stitched = stitch_flatten(indeces)
 #Lomb_Scargle(time_stitched, flux_stitched, exptime_stitched)
+
 #XMM_spec()
 #XMM_test()
-ZTF_data()
+#ZTF_data()
+
+time,flux,exptime, flux_error = Kepler_data(indexes[0])
+Lomb_Scargle(time,flux,exptime)
+
 #multiple_LC_plot(indexes)
 #times, fluxes, orbitals, spins, news = mulitple_sector_LS(indexes)
 #peak_frequencies = np.array([7.633                                                                                ])
 #phase_fold_binned(times[0], fluxes[0], peak_frequencies)
 
 
-time,flux,exptime,flux_error = sector_data(indexes[0])
+#time,flux,exptime,flux_error = sector_data(indexes[0])
 print(time)
 #frequency,power,peak_frequencies,peak_powers = Lomb_Scargle(time,flux,exptime)
 #peak_classification(frequency,power,peak_frequencies,peak_powers)
