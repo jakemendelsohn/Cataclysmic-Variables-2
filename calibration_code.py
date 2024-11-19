@@ -249,3 +249,4 @@ matched_frequencies = find_combinations(fundamental_frequencies, all_frequencies
 print("Matched combinations (n, f1, m, f2, combination frequency):")
 for match in matched_frequencies:
     print(match)
+    
