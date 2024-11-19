@@ -35,7 +35,7 @@ def sector_data(index):
     return time,flux,exptime,flux_error
 
 def Kepler_data(index):
-    search_result = lk.search_lightcurve("04:07:00.919 +18:49:35.79")
+    search_result = lk.search_lightcurve("20:15:35.65390 +37:11:22.3802",radius = 10)
     print(search_result)
     lc = search_result[index].download()
     exptime = search_result.table['exptime'][index]
@@ -100,42 +100,11 @@ def stitch_flatten(indeces):
     plt.show()
     
     return flux_stitched,time_stitched,exptime_stitched
-    
-def XMM_spec():
-    # Load the spectrum data file
-    with fits.open('C:/Users/jakem/OneDrive/Documents/Year 4 Project/XMM Data/GUEST18477658/3154/0782060201/PN/P0782060201PNS003SRSPEC0001.FTZ') as hdul:
-        data = hdul[1].data  # Adjust this index if necessary
-        channels = data['CHANNEL']
-        counts = data['COUNTS']
-        
-            
-    # Load the ARF file to get effective area (if available)
-    with fits.open('C:/Users/jakem/OneDrive/Documents/Year 4 Project/XMM Data/GUEST18477658/3154/0782060201/PN/P0782060201PNS003SRCARF0001.FTZ') as arf_hdul:
-        arf_data = arf_hdul[1].data
-        effective_area = arf_data['SPECRESP']  # Effective area for each energy bin
-        
- 
-    energy_min = 0.2  # keV
-    energy_max = 10.0  # keV
-    energies = np.linspace(energy_min, energy_max, len(channels))
 
-    # Convert counts to flux: flux = counts / effective_area
-    # Ensure the lengths of `counts` and `effective_area` match
-    interp_func = interp1d(np.arange(len(effective_area)), effective_area, kind='linear', fill_value="extrapolate")
-    effective_area_resampled = interp_func(np.linspace(0, len(effective_area) - 1, len(counts)))
-    flux = counts / effective_area_resampled
-    
-    # Plotting the flux vs. energy spectrum
-    plt.figure(figsize=(10, 6))
-    plt.plot(energies, flux, drawstyle='steps-mid')
-    plt.xlabel('Energy (keV)')
-    plt.ylabel('Flux (photons/cm²/s/keV)')
-    plt.title('Flux vs Energy Spectrum')
-    plt.show()
+
 
 def XMM_test():
-    file_paths = [
-    'C:/Users/jakem/OneDrive/Documents/Year 4 Project/XMM Data/GUEST18477658/3154/0782060201/PN/P0782060201PNS003SRCTSR8001.FTZ',
+    file_paths = ['C:/Users/jakem/OneDrive/Documents/Year 4 Project/XMM Data/GUEST18477658/3154/0782060201/PN/P0782060201PNS003SRCTSR8001.FTZ',
     'C:/Users/jakem/OneDrive/Documents/Year 4 Project/XMM Data/GUEST18477658/3154/0782060201/PN/P0782060201PNS003SRCTSR8002.FTZ',
     'C:/Users/jakem/OneDrive/Documents/Year 4 Project/XMM Data/GUEST18477658/3154/0782060201/PN/P0782060201PNS003SRCTSR8003.FTZ',
     'C:/Users/jakem/OneDrive/Documents/Year 4 Project/XMM Data/GUEST18477658/3154/0782060201/PN/P0782060201PNS003SRCTSR8004.FTZ']
@@ -163,6 +132,101 @@ def XMM_test():
     # Adjust layout
     plt.tight_layout(rect=[0, 0, 1, 0.96])  # Leave space for the main title
     plt.show()
+    
+def XMM_time_series():
+    with fits.open("C:/Users/jakem/OneDrive/Documents/Year 4 Project/XMM Data/J2015/LightCurve/0744640101/pps/P0744640101PNS003SRCTSR8001.FTZ") as hdul:
+        spectrum_data = hdul[1].data
+        column_headers = spectrum_data.columns.names
+        print("Column Headers:", column_headers)
+        time = spectrum_data['TIME']
+        time = time-min(time)
+        rate = spectrum_data['RATE']  # Source rate
+        back = spectrum_data['BACKV']  # Background rate
+        err_rate = spectrum_data['ERROR']  # Error in source rate
+        err_back = spectrum_data['BACKE']  # Error in background rate
+        
+        
+        bin_size = 239.44  # Desired bin size in seconds
+        binned_time, binned_rate, binned_err_rate, binned_back, binned_err_back = rebin_lightcurve(time, rate, err_rate, back, err_back, bin_size)
+        binned_source_rate = binned_rate - binned_back
+        binned_source_error = np.sqrt(binned_err_rate**2 + binned_err_back**2)
+        
+
+        
+        # Plotting
+        plt.figure(figsize=(10, 6))
+        plt.errorbar(binned_time, binned_source_rate, yerr=binned_source_error, fmt='o', markersize=2, label='Rebinned Data', color='black', ecolor='red')
+        plt.xlabel("Time (s-534962075.616543s)", fontsize=14)
+        plt.ylabel("Rate (counts/s)", fontsize=14)
+        plt.title(f"Rebinned Light Curve (Bin Size = {bin_size}s)", fontsize=16)
+        plt.legend(fontsize=12)
+        #plt.ylim(0,0.7)
+        plt.show()
+        
+        # Background-subtracted rate and propagated errors
+        #source_rate = rate - back
+        #source_error = np.sqrt(err_rate**2 + err_back**2)
+        
+        # Mean rates
+        #mean_source_rate = np.mean(source_rate)
+        #mean_back_rate = np.mean(back)
+        
+        # Plot
+        #fig, ax = plt.subplots(2, 1, figsize=(10,12), sharex=True)
+        
+        #plt.errorbar(time, source_rate, yerr=source_error, fmt='o', markersize=2, label='Background-subtracted', color='black', ecolor='red')
+        #plt.set_title(f"Background subtracted time series    Mean Rate= {mean_source_rate:.7f}", fontsize=16)
+        #plt.set_ylabel("Counts / sec", fontsize=14)
+        #plt.grid()
+        #plt.legend(fontsize=12)
+        #plt.tick_params(axis='both', labelsize=12)
+        #plt.xlabel("time")
+       # plt.ylabel("Rate")
+        
+        # Bottom panel: Background time series
+        #ax[1].errorbar(time, back, yerr=err_back, fmt='o', markersize=2, label='Background', color='black', ecolor='red')
+        #ax[1].set_title(f"Background time series    Mean Rate= {mean_back_rate:.7f}", fontsize=16)
+        #ax[1].set_xlabel("Time (secs)", fontsize=14)
+        #ax[1].set_ylabel("Counts / sec", fontsize=14)
+        #ax[1].grid()
+        #ax[1].legend(fontsize=12)
+        #ax[1].tick_params(axis='both', labelsize=16)
+        
+        #plt.tight_layout()
+        #plt.show()
+        
+def rebin_lightcurve(time, rate, error, back, err_back, bin_size):
+    # Calculate the number of bins
+    min_time = np.min(time)
+    max_time = np.max(time)
+    num_bins = int(np.ceil((max_time - min_time) / bin_size))
+    
+    # Define the bins
+    bin_edges = np.linspace(min_time, max_time, num_bins + 1)
+    bin_centers = 0.5 * (bin_edges[:-1] + bin_edges[1:])
+    
+    # Initialize arrays for binned data
+    binned_rate = []
+    binned_error = []
+    binned_back = []
+    binned_err_back = []
+    
+    # Loop through bins and calculate means
+    for i in range(num_bins):
+        mask = (time >= bin_edges[i]) & (time < bin_edges[i + 1])
+        if np.any(mask):
+            binned_rate.append(np.mean(rate[mask]))
+            binned_error.append(np.sqrt(np.sum(error[mask]**2)) / np.sum(mask))  # Propagated error
+            binned_back.append(np.mean(back[mask]))
+            binned_err_back.append(np.sqrt(np.sum(err_back[mask]**2)) / np.sum(mask))  # Propagated error
+        else:
+            # Fill empty bins with NaNs
+            binned_rate.append(np.nan)
+            binned_error.append(np.nan)
+            binned_back.append(np.nan)
+            binned_err_back.append(np.nan)
+    
+    return bin_centers, np.array(binned_rate), np.array(binned_error), np.array(binned_back), np.array(binned_err_back)
      
 def ZTF_data():
     zquery = query.ZTFQuery()
@@ -739,12 +803,13 @@ indeces = [0,1,2,3]
 #flux_stitched, time_stitched, exptime_stitched = stitch_flatten(indeces)
 #Lomb_Scargle(time_stitched, flux_stitched, exptime_stitched)
 
-#XMM_spec()
+
 #XMM_test()
+XMM_time_series()
 #ZTF_data()
 
-time,flux,exptime, flux_error = Kepler_data(indexes[0])
-Lomb_Scargle(time,flux,exptime)
+#time,flux,exptime, flux_error = Kepler_data(indexes[0])
+#Lomb_Scargle(time,flux,exptime)
 
 #multiple_LC_plot(indexes)
 #times, fluxes, orbitals, spins, news = mulitple_sector_LS(indexes)
