@@ -13,6 +13,7 @@ from ztfquery import lightcurve
 from astropy import time
 from ztfquery import query
 import pandas as pd
+from scipy.fft import fft, fftfreq
 
 
 def sector_data(index):
@@ -145,13 +146,24 @@ def XMM_time_series():
         err_rate = spectrum_data['ERROR']  # Error in source rate
         err_back = spectrum_data['BACKE']  # Error in background rate
         
-        
+            
+            
         bin_size = 239.44  # Desired bin size in seconds
         binned_time, binned_rate, binned_err_rate, binned_back, binned_err_back = rebin_lightcurve(time, rate, err_rate, back, err_back, bin_size)
         binned_source_rate = binned_rate - binned_back
         binned_source_error = np.sqrt(binned_err_rate**2 + binned_err_back**2)
         
-
+        plt.errorbar(binned_time,binned_back,yerr = binned_err_back,fmt = 'o',markersize=2,label = 'Rebinned background data',color = 'black', ecolor = 'red')
+        plt.xlabel("Time (s-534962075.616543s)", fontsize=12)
+        plt.ylabel("Rate (counts/s)", fontsize=12)
+        plt.title(f"Rebinned Background Light Curve (Bin Size = {bin_size}s)", fontsize=12)
+        plt.legend(fontsize=12)
+        plt.show()
+        
+        mask = binned_source_rate >= 0  # Keep only points where binned_source_rate >= 0
+        binned_time = binned_time[mask]
+        binned_source_rate = binned_source_rate[mask]
+        binned_source_error = binned_source_error[mask]
         
         # Plotting
         plt.figure(figsize=(10, 6))
@@ -162,39 +174,29 @@ def XMM_time_series():
         plt.legend(fontsize=12)
         #plt.ylim(0,0.7)
         plt.show()
-        
-        # Background-subtracted rate and propagated errors
-        #source_rate = rate - back
-        #source_error = np.sqrt(err_rate**2 + err_back**2)
-        
-        # Mean rates
-        #mean_source_rate = np.mean(source_rate)
-        #mean_back_rate = np.mean(back)
-        
-        # Plot
-        #fig, ax = plt.subplots(2, 1, figsize=(10,12), sharex=True)
-        
-        #plt.errorbar(time, source_rate, yerr=source_error, fmt='o', markersize=2, label='Background-subtracted', color='black', ecolor='red')
-        #plt.set_title(f"Background subtracted time series    Mean Rate= {mean_source_rate:.7f}", fontsize=16)
-        #plt.set_ylabel("Counts / sec", fontsize=14)
-        #plt.grid()
-        #plt.legend(fontsize=12)
-        #plt.tick_params(axis='both', labelsize=12)
-        #plt.xlabel("time")
-       # plt.ylabel("Rate")
-        
-        # Bottom panel: Background time series
-        #ax[1].errorbar(time, back, yerr=err_back, fmt='o', markersize=2, label='Background', color='black', ecolor='red')
-        #ax[1].set_title(f"Background time series    Mean Rate= {mean_back_rate:.7f}", fontsize=16)
-        #ax[1].set_xlabel("Time (secs)", fontsize=14)
-        #ax[1].set_ylabel("Counts / sec", fontsize=14)
-        #ax[1].grid()
-        #ax[1].legend(fontsize=12)
-        #ax[1].tick_params(axis='both', labelsize=16)
-        
-        #plt.tight_layout()
-        #plt.show()
-        
+    time_step = np.median(np.diff(binned_time))  # Calculate time step from binned_time
+
+    # Perform Fourier Transform
+    fft_result = fft(binned_source_rate)  # FFT of binned_source_rate
+    frequencies = fftfreq(len(binned_source_rate), d=time_step)  # Corresponding frequencies
+    
+    # Power spectrum (magnitude of FFT)
+    power = np.abs(fft_result)**2
+    
+    # Keep only positive frequencies for plotting
+    positive_frequencies = frequencies[frequencies >= 0]*60*60*24
+    positive_power = power[frequencies >= 0]
+    
+    # Plot frequency vs. power
+    plt.figure(figsize=(10, 6))
+    plt.plot(positive_frequencies, positive_power*positive_frequencies, label="Power Spectrum")
+    plt.xlabel("Frequency (Hz)", fontsize=14)
+    plt.ylabel("Power", fontsize=14)
+    plt.title("Frequency vs Power Spectrum", fontsize=16)
+    plt.xlim(0,100)
+    plt.legend(fontsize=12)
+    plt.show()
+            
 def rebin_lightcurve(time, rate, error, back, err_back, bin_size):
     # Calculate the number of bins
     min_time = np.min(time)
@@ -227,7 +229,8 @@ def rebin_lightcurve(time, rate, error, back, err_back, bin_size):
             binned_err_back.append(np.nan)
     
     return bin_centers, np.array(binned_rate), np.array(binned_error), np.array(binned_back), np.array(binned_err_back)
-     
+
+
 def ZTF_data():
     zquery = query.ZTFQuery()
     lcq = lightcurve.LCQuery.from_position(61.7666727, +18.9272377, 5)
