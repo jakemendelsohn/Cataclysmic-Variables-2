@@ -17,7 +17,7 @@ from scipy.fft import fft, fftfreq
 
 
 def sector_data(index):
-    search_result = lk.search_lightcurve('RX J2015.6+3711', mission='TESS')
+    search_result = lk.search_lightcurve('04 07 4.080 +18 55 37.20', mission='TESS')
     print(search_result)
     lc = search_result[index].download()
     exptime = search_result.table['exptime'][index]
@@ -64,8 +64,8 @@ def stitch_flatten(indeces):
     times = []
     fluxes = []
     flux_errors = []
-    labels = ["sector 41", "sector 55", "sector 75", "sector 82"]   #adjust accordingly
-    search_result = lk.search_lightcurve('RX J2015.6+3711', mission='TESS')
+    labels = ["sector 43", "sector 44", "sector 70", "sector 71"]   #adjust accordingly
+    search_result = lk.search_lightcurve('04 07 4.080 +18 55 37.20', mission='TESS')
     for i, index in enumerate(indeces):
         lc = search_result[index].download()
         processed_lc = lc.flatten()
@@ -105,34 +105,10 @@ def stitch_flatten(indeces):
 
 
 def XMM_test():
-    file_paths = ['C:/Users/jakem/OneDrive/Documents/Year 4 Project/XMM Data/GUEST18477658/3154/0782060201/PN/P0782060201PNS003SRCTSR8001.FTZ',
-    'C:/Users/jakem/OneDrive/Documents/Year 4 Project/XMM Data/GUEST18477658/3154/0782060201/PN/P0782060201PNS003SRCTSR8002.FTZ',
-    'C:/Users/jakem/OneDrive/Documents/Year 4 Project/XMM Data/GUEST18477658/3154/0782060201/PN/P0782060201PNS003SRCTSR8003.FTZ',
-    'C:/Users/jakem/OneDrive/Documents/Year 4 Project/XMM Data/GUEST18477658/3154/0782060201/PN/P0782060201PNS003SRCTSR8004.FTZ']
-    fig, axs = plt.subplots(2, 2, figsize=(10, 8))
-    fig.suptitle('XMM Time Series for Multiple Files')
-    colors = ['blue', 'green', 'red', 'purple']
-    for i, file_path in enumerate(file_paths):
-        with fits.open(file_path) as hdul:
-            spectrum_data = hdul[1].data
-            time = spectrum_data['TIME']
-            rate = spectrum_data['RATE']
-            backv = spectrum_data['BACKV']  # Background rate
-
-            # Calculate background-subtracted rate
-            net_rate = rate - backv
-
-            # Determine subplot position
-            ax = axs[i // 2, i % 2]
-            ax.plot(time, net_rate, color=colors[i],lw=1)
-            ax.set_xlabel('Time (s)')
-            ax.set_ylabel('Net Rate (c/s)')
-            ax.set_title(f'Camera {i+1}')
-            ax.set_ylim(0, 3)  # Adjust if needed for better visualization
-
-    # Adjust layout
-    plt.tight_layout(rect=[0, 0, 1, 0.96])  # Leave space for the main title
-    plt.show()
+    with fits.open("C:/Users/jakem/OneDrive/Documents/Year 4 Project/XMM Data/0782060201/3154_0782060201_SCX00000ATS.FIT") as hdul:
+        spectrum_data = hdul[1].data
+        column_headers = spectrum_data.columns.names
+        print("Column Headers:", column_headers)
     
 def XMM_time_series():
     with fits.open("C:/Users/jakem/OneDrive/Documents/Year 4 Project/XMM Data/J2015/LightCurve/0744640101/pps/P0744640101PNS003SRCTSR8001.FTZ") as hdul:
@@ -148,7 +124,7 @@ def XMM_time_series():
         
             
             
-        bin_size = 239.99  # Desired bin size in seconds
+        bin_size = 800  # Desired bin size in seconds
         binned_time, binned_rate, binned_err_rate, binned_back, binned_err_back = rebin_lightcurve(time, rate, err_rate, back, err_back, bin_size)
         binned_source_rate = binned_rate - binned_back
         binned_source_error = np.sqrt(binned_err_rate**2 + binned_err_back**2)
@@ -167,6 +143,7 @@ def XMM_time_series():
         
         # Plotting
         plt.figure(figsize=(10, 6))
+        plt.plot(binned_time, binned_source_rate)
         plt.errorbar(binned_time, binned_source_rate, yerr=binned_source_error, fmt='o', markersize=2, label='Rebinned Data', color='black', ecolor='red')
         plt.xlabel("Time (s-534962075.616543s)", fontsize=14)
         plt.ylabel("Rate (counts/s)", fontsize=14)
@@ -174,36 +151,33 @@ def XMM_time_series():
         plt.legend(fontsize=12)
         #plt.ylim(0,0.7)
         plt.show()
-    time_step = np.median(np.diff(binned_time))  # Calculate time step from binned_time
-    # Perform Fourier Transform
-    #fft_result = fft(binned_source_rate)  # FFT of binned_source_rate
-    #frequencies = fftfreq(len(binned_source_rate), d=time_step)
-    f_min,f_max = frequency_range(binned_time, binned_source_rate, 240)
-    frequencies = np.linspace(f_min,f_max, 2*len(binned_time))
-    # Power spectrum (magnitude of FFT)
+    
+    
+    
+    frequencies = np.logspace(-5, -3, 100000)  # 10^-5 to 1 Hz
+
+    # Lomb-Scargle Periodogram
     ls = LombScargle(binned_time, binned_source_rate)
-    power = ls.power(frequencies,normalization = "model")
+    power = ls.power(frequencies)
     
-    # Keep only positive frequencies for plotting
-    positive_frequencies = frequencies[frequencies >= 0]
-    positive_power = power[frequencies >= 0]
-    
-    # Plot frequency vs. power
+    # Plot in log-log scale
     plt.figure(figsize=(10, 6))
-    plt.plot(positive_frequencies, positive_power*positive_frequencies, label="Power Spectrum")
-    plt.xlabel("Frequency (c/d)", fontsize=14)
-    plt.ylabel("Power x Frequency", fontsize=14)
-    plt.title("Frequency vs Power Spectrum", fontsize=16)
-    plt.xlim(0,30)
-    plt.ylim(0,0.7)
+    plt.plot(frequencies, power, label="Power Spectrum")
+    
+    frequencies_to_mark = [1.39e-4, 2.78e-4]
+    for freq in frequencies_to_mark:
+        plt.axvline(x=freq, color="red", linestyle="--", label=f"f = {freq} Hz")
+        
+    
+    plt.xscale("log")
+    plt.xlabel("Frequency (Hz)", fontsize=14)
+    plt.ylabel("Power", fontsize=14)
+    plt.title("Log-Log Periodogram", fontsize=16)
     plt.legend(fontsize=12)
-    
-    vertical_lines_x = []
-    for x_val in vertical_lines_x:
-        plt.axvline(x=x_val, color='red', linestyle='--', label=f'Line at x={x_val}')
-    
     plt.show()
+    
     return binned_source_rate, binned_time
+
             
 def rebin_lightcurve(time, rate, error, back, err_back, bin_size):
     # Calculate the number of bins
@@ -241,7 +215,7 @@ def rebin_lightcurve(time, rate, error, back, err_back, bin_size):
 
 def ZTF_data():
     zquery = query.ZTFQuery()
-    lcq = lightcurve.LCQuery.from_position(61.7666727, +18.9272377, 5)
+    lcq = lightcurve.LCQuery.from_position(303.904, +37.19, 5)
     ZTF_data = pd.DataFrame({'JD' : lcq.data.mjd+2400000.5, 'Magnitude' : lcq.data.mag, 'Magnitude_Error' : lcq.data.magerr, "Filter" : lcq.data.filtercode})
     #data = lcq.download_data()
     #lcq = lightcurve.LCQuery(data)
@@ -326,8 +300,8 @@ def Lomb_Scargle(time,flux,exptime):
     #plt.yscale('log')
     #plt.yscale('linear')
     #plt.xscale('linear')
-    plt.xlim(0,55)
-    plt.ylim(0,0.01)
+    plt.xlim(50,70)
+    plt.ylim(0,0.06)
     
     # Set axis labels
     plt.xlabel('Frequency (c/d)')
@@ -347,7 +321,7 @@ def Lomb_Scargle(time,flux,exptime):
         
     #freq_int_manual2 = [0.27,0.88,1.788,2.178,6.68,8.45,24.54,25.37,25.85]
     #freq_int_manual2 = [2.43,4.08,6.51,7.663,12.23,16.31,20.38]
-    freq_int_manual2 = [3.76,4.58,5.28,50.5]
+    freq_int_manual2 = [0.89,6.68,8.455,24.54,25.38,25.86]
     
     y_vals = np.linspace(0,13,1000)
     for freq in orbital_frequencies:
@@ -417,6 +391,49 @@ def bootstrap_lomb_scargle(time, flux, num_iterations=1000, num_freqs=10000,expt
     plt.ylim(0,0.005)
     plt.legend()
     plt.show()
+
+def bootstrap_errors(time, flux, exptime, num_freqs=10000, num_bootstraps=500):
+    # Stack time and flux for easier resampling
+    time_flux_pairs = np.column_stack((time, flux))
+    min_freq, max_freq = frequency_range(time, flux, exptime)
+    frequencies = np.linspace(min_freq, max_freq, num_freqs)
+    
+    # Exclude frequencies below 1.5
+    valid_frequencies = frequencies[frequencies >= 1.5]
+
+    # Number of data points
+    N = len(flux)
+    peak_frequencies = []
+
+    for _ in range(num_bootstraps):
+        # Resample with replacement
+        resampled_indices = np.random.choice(np.arange(N), size=N, replace=True)
+        resampled_pairs = time_flux_pairs[resampled_indices]
+
+        # Separate resampled time and flux
+        resampled_time = resampled_pairs[:, 0]
+        resampled_flux = resampled_pairs[:, 1]
+
+        # Perform Lomb-Scargle periodogram
+        ls = LombScargle(resampled_time, resampled_flux)
+        power = ls.power(valid_frequencies)
+
+        # Find peak frequency (only considering valid frequencies)
+        peak_frequency = valid_frequencies[np.argmax(power)]
+        peak_frequencies.append(peak_frequency)
+
+    # Plot distribution of peak frequencies
+    plt.figure(figsize=(10, 6))
+    plt.hist(peak_frequencies, bins=5000, color='blue', alpha=0.7, edgecolor='black')
+    plt.xlabel("Frequency [d$^{-1}$]")
+    plt.ylabel("Count")
+    plt.title("Distribution of Peak Frequencies from Resampled Datasets (Filtered)")
+    plt.xlim(0,10)
+    plt.show()
+
+    return peak_frequencies
+
+        
 def mulitple_sector_LS(index_list):
     results = {}
 
@@ -569,9 +586,9 @@ def peak_finder(frequency, power,  height_threshold=0.01, prominence=0.001):
     return peak_frequencies, peak_powers
 
 def peak_classification(frequency,power,peak_frequencies,peak_powers,tolerance = 0.005):
-    orbital_period = 0.5319
+    orbital_period = 0.131
     #orbital_period = 0.068233846
-    spin_period = 0.0833
+    spin_period = 0.122
     natural_orbital_frequency = 1/orbital_period
     natural_spin_frequency = 1/spin_period
     natural_beat_frequency = abs(natural_spin_frequency-natural_orbital_frequency)
@@ -856,12 +873,12 @@ def model_fit(time, flux, flux_error):
 indexes = [0,1]
 indeces = [0,1,2,3]
 
-#flux_stitched, time_stitched, exptime_stitched = stitch_flatten(indeces)
-#Lomb_Scargle(time_stitched, flux_stitched, exptime_stitched)
+flux_stitched, time_stitched, exptime_stitched = stitch_flatten(indeces)
+Lomb_Scargle(time_stitched, flux_stitched, exptime_stitched)
 
 
 #XMM_test()
-flux,time = XMM_time_series()
+#flux,time = XMM_time_series()
 #ZTF_data()
 
 #time,flux,exptime, flux_error = Kepler_data(indexes[0])
@@ -870,12 +887,13 @@ flux,time = XMM_time_series()
 
 #multiple_LC_plot(indexes)
 #times, fluxes, orbitals, spins, news = mulitple_sector_LS(indexes)
-#peak_frequencies = np.array([7.633                                                                                ])
-#phase_fold_binned(times[0], fluxes[0], peak_frequencies)
+#peak_frequencies = np.array([11])
+#phase_fold_binned(time, flux, peak_frequencies)
 
 
-#time,flux,exptime,flux_error = sector_data(indeces[0])
+time,flux,exptime,flux_error = sector_data(indeces[0])
 #bootstrap_lomb_scargle(time, flux)
+bootstrap_errors(time, flux, exptime)
 #Lomb_Scargle(time, flux, exptime)
 
 #frequency,power,peak_frequencies,peak_powers = Lomb_Scargle(time,flux,exptime)
