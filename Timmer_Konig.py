@@ -21,15 +21,17 @@ from astropy import time
 from ztfquery import query
 import pandas as pd
 from scipy.fft import fft, fftfreq
+from scipy.interpolate import interp1d
 
 
 def sector_data(index):
-    search_result = lk.search_lightcurve('04 07 4.080 +18 55 37.20', mission='TESS')
+    search_result = lk.search_lightcurve('RX J2015.6+3711', mission='TESS')
     print(search_result)
     lc = search_result[index].download()
     exptime = search_result.table['exptime'][index]
     sap_lc = lc.SAP_FLUX
     #sap_lc_cleaned = sap_lc.remove_nans()
+    
     quality_flags = sap_lc.quality
     flagged_indices = np.where(quality_flags != 0)[0]
     good_quality_mask = quality_flags == 0  # Keeps only points with a quality flag of 0 (good data)
@@ -37,6 +39,8 @@ def sector_data(index):
     time = sap_lc.time.value[good_quality_mask]
     flux = sap_lc.flux.value[good_quality_mask]
     flux_error = sap_lc.flux_err.value[good_quality_mask]  
+    
+    
  
     #sap_lc_cleaned = sap_lc.remove_outliers()
     #time = sap_lc_cleaned.time.value
@@ -75,7 +79,8 @@ def LC_model(time,flux,exptime,flux_error):
     plt.show()
     return A, alpha, B, power, frequency
 
-def simulated_lc(power,frequency, A, alpha, B, num = 10000):
+def simulated_lc(time,flux,power,frequency, A, alpha, B, num = 100000):
+        mean_lc = np.average(flux)
         mean = 0
         std_dev = 1
         params = A,alpha,B
@@ -88,8 +93,6 @@ def simulated_lc(power,frequency, A, alpha, B, num = 10000):
             imag = random_numbers[1] * np.sqrt(power_law_model(frequency[i], *params) / 2)
             simulated_freqs.append(real + imag * 1j)
 
-        # Handle zero-frequency and Nyquist (or last frequency) components
-        simulated_freqs = [0] + simulated_freqs  # Add DC component (mean = 0)
 
         if num % 2 == 0:
             # Even case: add Nyquist frequency (real-only)
@@ -100,34 +103,69 @@ def simulated_lc(power,frequency, A, alpha, B, num = 10000):
         # Add negative frequencies as conjugates of positive frequencies
         negative_freqs = np.conjugate(simulated_freqs[-2:0:-1])  # Skip DC and Nyquist
         simulated_freqs = np.concatenate((simulated_freqs, negative_freqs))
+        simulated_freqs[0] = mean_lc * len(simulated_freqs) #Add DC term to make mean of simulated lc match the original mean
         
         # Inverse Fourier Transform to generate time series
         time_series = np.fft.ifft(simulated_freqs).real  # Ensure real time series
+        ift_time = np.linspace(0,len(time_series),num=num)
         
-        # Plot the time series
-        plt.figure(figsize=(10, 6))
-        plt.plot(time_series, label="Simulated Light Curve")
-        plt.title("Time Series from Inverse Fourier Transform")
-        plt.xlabel("Time Steps")
-        plt.ylabel("Amplitude")
-        plt.legend()
-        plt.show()
+        print(len(time_series))
+
         
-        return time_series
+        #Need to interpolate evenly spaced data to achieve same spacing as original data
+        interpolator = interp1d(ift_time, time_series, kind='linear', fill_value="extrapolate")
+        aligned_flux = interpolator(np.linspace(ift_time[0], ift_time[-1], len(time)))
+
+        #plt.figure(figsize=(10, 6))
+        #plt.plot(time, aligned_flux, label="Simulated Light Curve (Aligned)")
+        #plt.title("Simulated Light Curve Aligned to Original Time")
+        #plt.xlabel("Time")
+        #plt.ylabel("Flux")
+        #plt.legend()
+        #plt.show()
+        
+        ls = LombScargle(time, aligned_flux)
+        power = ls.power(frequency)
+        
+        aligned_time = time
+        
+        return aligned_time, aligned_flux,frequency, power
     
-def bootstrap(time_series):
-    print(time_series)
+def bootstrap(N,time,flux,power, frequency, A, alpha, B):
+    power_matrix = np.zeros((N, len(frequency)))
+    for i in range(0,N-1):
+        aligned_time, aligned_flux, frequency, new_power = simulated_lc(time, flux, power, frequency, A, alpha, B)
+        power_matrix[i, :] = new_power
+    
+    cutoff_powers = []
+    for col_idx in range(power_matrix.shape[1]):
+        powers = power_matrix[:, col_idx]
+        cutoff_power = np.percentile(powers, 99.7)  # 99.7% cutoff
+        cutoff_powers.append(cutoff_power)
+    
+    cutoff_powers = np.array(cutoff_powers)
+        
+    plt.figure()
+    plt.plot(frequency, cutoff_powers*frequency, label="99.7% Cutoff Powers")
+    plt.plot(frequency, power*frequency, label = "Original Power")
+    plt.xlabel("Frequency")
+    plt.ylabel("Cutoff Power")
+    plt.title("99.7% Cutoff Power vs Frequency")
+    plt.xlim(3,10)
+    plt.ylim(0,0.01)
+    plt.legend()
+    plt.show()
+    
         
        
   
         
         
-    
-        
-        
-        
 time,flux,exptime, flux_error = sector_data(0)
+plt.plot(time,flux, lw=1)
+plt.show()
 A, alpha, B,power, frequency = LC_model(time,flux,exptime, flux_error)
-time_series = simulated_lc(power,frequency,A, alpha,B)
-bootstrap(time_series)
+aligned_time, aligned_flux,frequency, new_power = simulated_lc(time,flux,power,frequency,A, alpha,B)
+N = 10
+bootstrap(N,time, flux, power, frequency, A, alpha, B)
 
