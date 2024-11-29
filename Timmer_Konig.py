@@ -32,6 +32,7 @@ def sector_data(index):
     sap_lc = lc.SAP_FLUX
     #sap_lc_cleaned = sap_lc.remove_nans()
     
+    
     quality_flags = sap_lc.quality
     flagged_indices = np.where(quality_flags != 0)[0]
     good_quality_mask = quality_flags == 0  # Keeps only points with a quality flag of 0 (good data)
@@ -57,6 +58,8 @@ def frequency_range(time,flux,del_t):
 def power_law_model(F, A, alpha, B):
     return A * F**alpha + B
     
+def power_law_model2(frequency, a, nu_knee, alpha_lo, alpha_hi, noise):
+    return a * frequency**(alpha_lo) * (1 + (frequency / nu_knee))**(alpha_hi - alpha_lo) + noise
 
 def LC_model(time,flux,exptime,flux_error):
     min_freq, max_freq = frequency_range(time,flux,exptime)
@@ -66,38 +69,44 @@ def LC_model(time,flux,exptime,flux_error):
     ls = LombScargle(time, flux)
     power = ls.power(frequency)
     
-    initial_guess = [1e-2, -1, 1e-6]
-    params, cov = curve_fit(power_law_model,frequency, power, p0=initial_guess)
+    #initial_guess = [1e-2, -1, 1e-6]
+    initial_guess2 = [1e-4, 10, -1, -2, 1e-6]
+    bounds = ([1e-10, 1e-3, -5, -5, 1e-10], [1e-1, 1e3, 0, 0, 1e-3])
+    params, cov = curve_fit(power_law_model2,frequency, power, p0=initial_guess2,bounds=bounds, maxfev=5000)
+    #print("Fitted Parameters:", params)
     
-    A, alpha, B = params
+    #A, alpha, B = params
+    a, nu_knee, alpha_lo, alpha_hi, noise = params
 
     plt.loglog(frequency, power, label='Data')
-    plt.loglog(frequency, power_law_model(frequency, *params), label=f'Fit: A={A:.2e}, alpha={alpha:.2f}, B={B:.2e}')
+    plt.loglog(frequency, power_law_model2(frequency, *initial_guess2), label="Initial Guess")
+    plt.loglog(frequency, power_law_model2(frequency, *params))
     plt.xlabel('Frequency (c/d)')
     plt.ylabel('Power')
     plt.legend()
     plt.show()
-    return A, alpha, B, power, frequency
+    return a, nu_knee, alpha_lo, alpha_hi, noise, power, frequency
 
-def simulated_lc(time,flux,power,frequency, A, alpha, B, num = 100000):
+def simulated_lc(time,flux,power,frequency, a, nu_knee, alpha_lo, alpha_hi, noise, num = 100000):
         mean_lc = np.average(flux)
         mean = 0
         std_dev = 1
-        params = A,alpha,B
+        #params = A,alpha,B
+        params = a, nu_knee, alpha_lo, alpha_hi, noise
         simulated_freqs = []
         reals = []
         imags = []
         for i in range(1, (num // 2) + 1):  # Only loop over positive frequencies
             random_numbers = np.random.normal(mean, std_dev, 2)
-            real = random_numbers[0] * np.sqrt(power_law_model(frequency[i], *params) / 2)
-            imag = random_numbers[1] * np.sqrt(power_law_model(frequency[i], *params) / 2)
+            real = random_numbers[0] * np.sqrt(power_law_model2(frequency[i], *params) / 2)
+            imag = random_numbers[1] * np.sqrt(power_law_model2(frequency[i], *params) / 2)
             simulated_freqs.append(real + imag * 1j)
 
 
         if num % 2 == 0:
             # Even case: add Nyquist frequency (real-only)
             simulated_freqs.append(
-                np.random.normal(mean, std_dev) * np.sqrt(power_law_model(frequency[num // 2], *params))
+                np.random.normal(mean, std_dev) * np.sqrt(power_law_model2(frequency[num // 2], *params))
                 )
 
         # Add negative frequencies as conjugates of positive frequencies
@@ -116,12 +125,12 @@ def simulated_lc(time,flux,power,frequency, A, alpha, B, num = 100000):
         interpolator = interp1d(ift_time, time_series, kind='linear', fill_value="extrapolate")
         aligned_flux = interpolator(np.linspace(ift_time[0], ift_time[-1], len(time)))
 
-        #plt.figure(figsize=(10, 6))
-        #plt.plot(time, aligned_flux, label="Simulated Light Curve (Aligned)")
-        #plt.title("Simulated Light Curve Aligned to Original Time")
-        #plt.xlabel("Time")
-        #plt.ylabel("Flux")
-        #plt.legend()
+  #      plt.figure(figsize=(10, 6))
+   #     plt.plot(time, aligned_flux, label="Simulated Light Curve (Aligned)")
+    #    plt.title("Simulated Light Curve Aligned to Original Time")
+     #   plt.xlabel("Time")
+      #  plt.ylabel("Flux")
+       # plt.legend()
         #plt.show()
         
         ls = LombScargle(time, aligned_flux)
@@ -131,10 +140,10 @@ def simulated_lc(time,flux,power,frequency, A, alpha, B, num = 100000):
         
         return aligned_time, aligned_flux,frequency, power
     
-def bootstrap(N,time,flux,power, frequency, A, alpha, B):
+def bootstrap(N,time,flux,power, frequency, a, nu_knee, alpha_lo, alpha_hi, noise):
     power_matrix = np.zeros((N, len(frequency)))
     for i in range(0,N-1):
-        aligned_time, aligned_flux, frequency, new_power = simulated_lc(time, flux, power, frequency, A, alpha, B)
+        aligned_time, aligned_flux, frequency, new_power = simulated_lc(time, flux, power, frequency, a, nu_knee, alpha_lo, alpha_hi, noise)
         power_matrix[i, :] = new_power
     
     cutoff_powers = []
@@ -149,10 +158,10 @@ def bootstrap(N,time,flux,power, frequency, A, alpha, B):
     plt.plot(frequency, cutoff_powers*frequency, label="99.7% Cutoff Powers")
     plt.plot(frequency, power*frequency, label = "Original Power")
     plt.xlabel("Frequency")
-    plt.ylabel("Cutoff Power")
+    plt.ylabel("Cutoff Power x Freq")
     plt.title("99.7% Cutoff Power vs Frequency")
-    plt.xlim(3,10)
-    plt.ylim(0,0.01)
+    plt.xlim(0,15)
+    plt.ylim(0,0.05)
     plt.legend()
     plt.show()
     
@@ -164,8 +173,8 @@ def bootstrap(N,time,flux,power, frequency, A, alpha, B):
 time,flux,exptime, flux_error = sector_data(0)
 plt.plot(time,flux, lw=1)
 plt.show()
-A, alpha, B,power, frequency = LC_model(time,flux,exptime, flux_error)
-aligned_time, aligned_flux,frequency, new_power = simulated_lc(time,flux,power,frequency,A, alpha,B)
-N = 10
-bootstrap(N,time, flux, power, frequency, A, alpha, B)
+a, nu_knee, alpha_lo, alpha_hi, noise, power, frequency = LC_model(time,flux,exptime, flux_error)
+aligned_time, aligned_flux,frequency, new_power = simulated_lc(time,flux,power,frequency, a, nu_knee, alpha_lo, alpha_hi, noise)
+N = 100
+bootstrap(N,time, flux, power, frequency, a, nu_knee, alpha_lo, alpha_hi, noise)
 
