@@ -17,7 +17,7 @@ from scipy.fft import fft, fftfreq
 
 
 def sector_data(index):
-    search_result = lk.search_lightcurve('04 07 4.080 +18 55 37.20', mission='TESS')
+    search_result = lk.search_lightcurve('RX J2015.6+3711', mission='TESS')
     print(search_result)
     lc = search_result[index].download()
     exptime = search_result.table['exptime'][index]
@@ -215,7 +215,7 @@ def rebin_lightcurve(time, rate, error, back, err_back, bin_size):
 
 def ZTF_data():
     zquery = query.ZTFQuery()
-    lcq = lightcurve.LCQuery.from_position(303.904, +37.19, 5)
+    lcq = lightcurve.LCQuery.from_position(61.767, +18.927, 5)
     ZTF_data = pd.DataFrame({'JD' : lcq.data.mjd+2400000.5, 'Magnitude' : lcq.data.mag, 'Magnitude_Error' : lcq.data.magerr, "Filter" : lcq.data.filtercode})
     #data = lcq.download_data()
     #lcq = lightcurve.LCQuery(data)
@@ -391,15 +391,20 @@ def bootstrap_lomb_scargle(time, flux, num_iterations=1000, num_freqs=10000,expt
     plt.ylim(0,0.005)
     plt.legend()
     plt.show()
+    
+def gaussian(x, a, mu, sigma):
+    return a * np.exp(-0.5 * ((x - mu) / sigma)**2)
+    
 
-def bootstrap_errors(time, flux, exptime, num_freqs=10000, num_bootstraps=500):
+def bootstrap_errors(time, flux, exptime, num_freqs=100000, num_bootstraps=5000):
     # Stack time and flux for easier resampling
     time_flux_pairs = np.column_stack((time, flux))
     min_freq, max_freq = frequency_range(time, flux, exptime)
     frequencies = np.linspace(min_freq, max_freq, num_freqs)
+
     
     # Exclude frequencies below 1.5
-    valid_frequencies = frequencies[frequencies >= 1.5]
+    valid_frequencies = frequencies[(frequencies >= 1.5) & (frequencies <= 10)]
 
     # Number of data points
     N = len(flux)
@@ -417,22 +422,102 @@ def bootstrap_errors(time, flux, exptime, num_freqs=10000, num_bootstraps=500):
         # Perform Lomb-Scargle periodogram
         ls = LombScargle(resampled_time, resampled_flux)
         power = ls.power(valid_frequencies)
+        #plt.plot(valid_frequencies,power)
+        #plt.show()
 
         # Find peak frequency (only considering valid frequencies)
         peak_frequency = valid_frequencies[np.argmax(power)]
         peak_frequencies.append(peak_frequency)
-
-    # Plot distribution of peak frequencies
-    plt.figure(figsize=(10, 6))
-    plt.hist(peak_frequencies, bins=5000, color='blue', alpha=0.7, edgecolor='black')
-    plt.xlabel("Frequency [d$^{-1}$]")
+        
+    bin_heights, bin_edges = np.histogram(peak_frequencies, bins=1500)
+    bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2  # Calculate bin centers
+    
+    plt.step(bin_centers,bin_heights,where = "mid")
+    plt.show()
+    
+    filter_mask = (bin_centers >= 4.57) & (bin_centers <= 4.59)
+    filtered_bin_centers = bin_centers[filter_mask]
+    filtered_bin_heights = bin_heights[filter_mask]
+    # Fit the Gaussian to the histogram
+    popt, pcov = curve_fit(gaussian, filtered_bin_centers, filtered_bin_heights, p0=[max(bin_heights), 4.58, 0.01])
+    
+    # Extract the fitted parameters
+    a_fit, mu_fit, sigma_fit = popt    
+        
+    #plt.hist(peak_frequencies, bins=1000, alpha=0.5)
+    plt.step(filtered_bin_centers, filtered_bin_heights, where="mid", label="Peak Frequency Distribution", color="blue", alpha=0.7)
+    x_fit = np.linspace(4.57,4.595, 1500)
+    plt.plot(x_fit, gaussian(x_fit, *popt), label=f"Gaussian Fit\n$\mu$={mu_fit:.5f}, $\sigma$={sigma_fit:.5f}", color="red")
+    plt.xlim(4.55,4.6)
+    #plt.ylim(0,1500)
+    plt.xlabel("Peak Frequency")
     plt.ylabel("Count")
-    plt.title("Distribution of Peak Frequencies from Resampled Datasets (Filtered)")
-    plt.xlim(0,10)
+    plt.title("Distribution of Peak Frequencies")
+    plt.legend()
     plt.show()
 
-    return peak_frequencies
+    print(f"Fitted Gaussian Parameters: a={a_fit:.5f}, mu={mu_fit:.5f}, sigma={sigma_fit:.5f}")
+    return bin_centers,bin_heights, popt
 
+def bootstrap_errors_multiple(indeces):
+    centres_array = np.array([])
+    heights_array = np.array([])
+    popt_array = np.array([])
+    for i in range(0,len(indeces)-1):
+        time, flux, exptime,flux_error = sector_data(indeces[i])
+        bin_centers,bin_heights, popt = bootstrap_errors(time, flux, exptime, num_freqs=100000, num_bootstraps=1000)
+        centres_array = np.append(centres_array,bin_centers)
+        heights_array = np.append(heights_array, bin_heights)
+        popt_array = np.append(popt_array,popt)
+    
+    fig, axes = plt.subplots(len(indeces), 1, figsize=(8, len(indeces) * 3), sharex=True)
+
+    for j in range(0,len(centres_array)-1):
+        ax = axes[j]
+
+        # Plot stepped histogram
+        ax.step(
+            centres_array[j],
+            heights_array[j],
+            where="mid",
+            label="Histogram",
+            color=f"C{j}",
+            alpha=0.7,
+        )
+
+        # Plot Gaussian fit
+        x_fit = np.linspace(min(centres_array[j]), max(centres_array[j]), 1000)
+        a_fit, mu_fit, sigma_fit = popt_array[j]
+        ax.plot(
+            x_fit,
+            gaussian(x_fit, a_fit, mu_fit, sigma_fit),
+            label=f"Gaussian Fit\n$\\mu={mu_fit:.2f} \\pm {sigma_fit:.2f}$",
+            color=f"C{j}",
+        )
+
+        # Add labels and grid
+        ax.set_ylabel("RMS Power", fontsize=10)
+        ax.grid(True)
+        ax.legend(fontsize=8)
+
+        # Annotate the mean and uncertainty
+        ax.text(
+            0.95,
+            0.85,
+            f"$\\mu={mu_fit:.2f}$\n$\\sigma={sigma_fit:.2f}$",
+            transform=ax.transAxes,
+            fontsize=8,
+            ha="right",
+            color=f"C{j}",
+        )
+
+    # Finalize plot
+    axes[-1].set_xlabel("Frequency [d$^{-1}$]", fontsize=10)
+    plt.tight_layout()
+    plt.show()
+        
+        
+    
         
 def mulitple_sector_LS(index_list):
     results = {}
@@ -871,10 +956,10 @@ def model_fit(time, flux, flux_error):
     return params, result.hess_inv, fitted_flux, chi2, reduced_chi2
 
 indexes = [0,1]
-indeces = [0,1,2,3]
+indeces = [0,1,3]
 
-flux_stitched, time_stitched, exptime_stitched = stitch_flatten(indeces)
-Lomb_Scargle(time_stitched, flux_stitched, exptime_stitched)
+#flux_stitched, time_stitched, exptime_stitched = stitch_flatten(indeces)
+#Lomb_Scargle(time_stitched, flux_stitched, exptime_stitched)
 
 
 #XMM_test()
@@ -894,6 +979,7 @@ Lomb_Scargle(time_stitched, flux_stitched, exptime_stitched)
 time,flux,exptime,flux_error = sector_data(indeces[0])
 #bootstrap_lomb_scargle(time, flux)
 bootstrap_errors(time, flux, exptime)
+#bootstrap_errors_multiple(indeces)
 #Lomb_Scargle(time, flux, exptime)
 
 #frequency,power,peak_frequencies,peak_powers = Lomb_Scargle(time,flux,exptime)
