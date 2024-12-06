@@ -36,7 +36,7 @@ def sector_data(index):
     return time,flux,exptime,flux_error
 
 def Kepler_data(index):
-    search_result = lk.search_lightcurve("20:15:35.65390 +37:11:22.3802",radius = 10)
+    search_result = lk.search_lightcurve('61.77 18.93',radius = 10)
     print(search_result)
     lc = search_result[index].download()
     exptime = search_result.table['exptime'][index]
@@ -64,7 +64,7 @@ def stitch_flatten(indeces):
     times = []
     fluxes = []
     flux_errors = []
-    labels = ["sector 41", "sector 55", "sector 82", "sector 71"]   #adjust accordingly
+    labels = ["sector 43", "sector 44", "sector 70", "sector 71"]   #adjust accordingly
     search_result = lk.search_lightcurve('04 07 4.080 +18 55 37.20', mission='TESS')
     for i, index in enumerate(indeces):
         lc = search_result[index].download()
@@ -300,8 +300,8 @@ def Lomb_Scargle(time,flux,exptime):
     #plt.yscale('log')
     #plt.yscale('linear')
     #plt.xscale('linear')
-    plt.xlim(50,70)
-    plt.ylim(0,0.06)
+    plt.xlim(0,20)
+    plt.ylim(0,0.1)
     
     # Set axis labels
     plt.xlabel('Frequency (c/d)')
@@ -321,7 +321,7 @@ def Lomb_Scargle(time,flux,exptime):
         
     #freq_int_manual2 = [0.27,0.88,1.788,2.178,6.68,8.45,24.54,25.37,25.85]
     #freq_int_manual2 = [2.43,4.08,6.51,7.663,12.23,16.31,20.38]
-    freq_int_manual2 = [0.89,6.68,8.455,24.54,25.38,25.86]
+    freq_int_manual2 = [0.89,0.27,4.62,8.455,24.54,25.38,25.86]
     
     y_vals = np.linspace(0,13,1000)
     for freq in orbital_frequencies:
@@ -347,6 +347,36 @@ def Lomb_Scargle(time,flux,exptime):
     # Show the plot
     plt.show()
     return frequency,power,orbital_frequencies,spin_frequencies,new_frequencies,beat_frequencies
+
+def Lomb_Scargle_Annotated(time,flux,exptime):
+    min_freq, max_freq = frequency_range(time,flux,exptime)
+    # Compute the Lomb-Scargle Periodogram within the specified frequency range
+    num_frequency_points = 100000  # You can adjust this based on the desired resolution
+    frequency = np.linspace(min_freq, max_freq, num_frequency_points)
+    ls = LombScargle(time, flux)
+    power = ls.power(frequency,normalization = "model")# Manually compute power without autopower
+    print(power)
+    # Plot the Lomb-Scargle Periodogram
+    plt.figure(figsize=(10, 6))
+    plt.plot(frequency, power*frequency, 'k', lw=1)
+    
+    peaks = [0.27, 0.89, 7.554 ,8.18, 8.45,15.74]  # Example peaks in frequency
+    labels = [r'$\alpha - \Omega$', r'$f_{prec}$', r'$\Omega - f_{prec}$', r'$\Omega$', r'$\alpha$',r'$2(\Omega - f_{prec})$']
+    heights = [0.02, 0.045, 0.038, 0.105, 0.06,0.03]
+    
+    for peak, label, height in zip(peaks, labels, heights):
+        peak_power = np.interp(peak, frequency, power)  # Find the power at the peak frequency
+        plt.annotate(label, xy=(peak, peak_power), xytext=(peak, height),
+                 textcoords='data', ha='center', fontsize=10)
+    
+    plt.xlim(-0.5,20)
+    plt.ylim(0,0.12)
+    
+    # Set axis labels
+    plt.xlabel('Frequency (c/d)')
+    plt.ylabel('Power x Frequency')
+    # Set plot title
+    plt.title('Lomb-Scargle Periodogram (Specified Frequency Range)')
 
 def bootstrap_lomb_scargle(time, flux, num_iterations=1000, num_freqs=10000,exptime = 120):
     # Frequency range
@@ -396,7 +426,7 @@ def gaussian(x, a, mu, sigma):
     return a * np.exp(-0.5 * ((x - mu) / sigma)**2)
     
 
-def bootstrap_errors(time, flux, exptime, num_freqs=10000, num_bootstraps=1000, f_min = 8.3, f_max = 8.5):
+def bootstrap_errors(time, flux, exptime, num_freqs=10000, num_bootstraps=1000, f_min = 7.5, f_max = 7.7):
     # Stack time and flux for easier resampling
     time_flux_pairs = np.column_stack((time, flux))
     min_freq, max_freq = frequency_range(time, flux, exptime)
@@ -439,7 +469,7 @@ def bootstrap_errors(time, flux, exptime, num_freqs=10000, num_bootstraps=1000, 
     filtered_bin_centers = bin_centers[filter_mask]
     filtered_bin_heights = bin_heights[filter_mask]
     # Fit the Gaussian to the histogram
-    popt, pcov = curve_fit(gaussian, filtered_bin_centers, filtered_bin_heights, p0=[max(bin_heights), 8.45, 0.01])
+    popt, pcov = curve_fit(gaussian, filtered_bin_centers, filtered_bin_heights, p0=[max(bin_heights), 7.62, 0.01])
     
     # Extract the fitted parameters
     a_fit, mu_fit, sigma_fit = popt    
@@ -459,7 +489,7 @@ def bootstrap_errors(time, flux, exptime, num_freqs=10000, num_bootstraps=1000, 
     print(f"Fitted Gaussian Parameters: a={a_fit:.5f}, mu={mu_fit:.5f}, sigma={sigma_fit:.5f}")
     return bin_centers,bin_heights, popt
 
-def bootstrap_errors_multiple(indices,f_min = 8.3,f_max = 8.5):
+def bootstrap_errors_multiple(indices,f_min = 7.5,f_max = 7.7):
     # Use lists instead of np.array for initial storage
     centres_array = []
     heights_array = []
@@ -968,7 +998,7 @@ def model_fit(time, flux, flux_error):
     return params, result.hess_inv, fitted_flux, chi2, reduced_chi2
 
 indexes = [0,1]
-indeces = [0,1,2]
+indeces = [0,1,2,3]
 
 #flux_stitched, time_stitched, exptime_stitched = stitch_flatten(indeces)
 #Lomb_Scargle(time_stitched, flux_stitched, exptime_stitched)
@@ -981,18 +1011,18 @@ indeces = [0,1,2]
 #time,flux,exptime, flux_error = Kepler_data(indexes[0])
 #Lomb_Scargle(time,flux,exptime)
 
-
 #multiple_LC_plot(indexes)
 #times, fluxes, orbitals, spins, news = mulitple_sector_LS(indexes)
 #peak_frequencies = np.array([11])
 #phase_fold_binned(time, flux, peak_frequencies)
 
 
-time,flux,exptime,flux_error = sector_data(indeces[1])
+time,flux,exptime,flux_error = sector_data(indeces[0])
 #bootstrap_lomb_scargle(time, flux)
-bootstrap_errors(time, flux, exptime)
-bootstrap_errors_multiple(indeces)
+#bootstrap_errors(time, flux, exptime)
+#bootstrap_errors_multiple(indeces)
 #Lomb_Scargle(time, flux, exptime)
+Lomb_Scargle_Annotated(time, flux, exptime)
 
 #frequency,power,peak_frequencies,peak_powers = Lomb_Scargle(time,flux,exptime)
 #peak_classification(frequency,power,peak_frequencies,peak_powers)
