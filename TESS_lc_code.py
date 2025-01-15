@@ -14,6 +14,7 @@ from astropy import time
 from ztfquery import query
 import pandas as pd
 from scipy.fft import fft, fftfreq
+import matplotlib.colors as colors
 
 
 def sector_data(index):
@@ -36,7 +37,7 @@ def sector_data(index):
     return time,flux,exptime,flux_error
 
 def Kepler_data(index):
-    search_result = lk.search_lightcurve('61.77 18.93',radius = 10)
+    search_result = lk.search_lightcurve('04 07 4.080 +18 55 37.20',mission = 'K2',radius = 20)
     print(search_result)
     lc = search_result[index].download()
     exptime = search_result.table['exptime'][index]
@@ -67,17 +68,15 @@ def stitch_flatten(indeces):
     labels = ["sector 43", "sector 44", "sector 70", "sector 71"]   #adjust accordingly
     search_result = lk.search_lightcurve('04 07 4.080 +18 55 37.20', mission='TESS')
     for i, index in enumerate(indeces):
-        lc = search_result[index].download()
-        processed_lc = lc.flatten()
-        processed_lc = processed_lc
+        processed_lc = search_result[index].download()
+        #processed_lc = lc.flatten()
+        #processed_lc = processed_lc
         sap_lc = processed_lc.SAP_FLUX
         quality_flags = sap_lc.quality
         flagged_indices = np.where(quality_flags != 0)[0]
         good_quality_mask = quality_flags == 0
         time = sap_lc.time.value[good_quality_mask]
         flux = sap_lc.flux.value[good_quality_mask]
-        mean = np.mean(flux)
-        flux = flux/mean
         flux_error = sap_lc.flux_err.value[good_quality_mask]  
         light_curves.append(sap_lc)
         times.append(time)
@@ -97,7 +96,7 @@ def stitch_flatten(indeces):
     exptime_stitched = 120 #Adjust Accordingly
     #plt.plot(time_stitched,flux_stitched,lw = 1)
     plt.xlabel("Time (BJD-2457000, days)")
-    plt.ylabel("Normalised Flux")
+    plt.ylabel("Flux (e/s)")
     plt.show()
     
     return flux_stitched,time_stitched,exptime_stitched
@@ -360,17 +359,21 @@ def Lomb_Scargle_Annotated(time,flux,exptime):
     plt.figure(figsize=(10, 6))
     plt.plot(frequency, power*frequency, 'k', lw=1)
     
-    peaks = [0.27, 0.89, 7.554 ,8.18, 8.45,15.74]  # Example peaks in frequency
-    labels = [r'$\alpha - \Omega$', r'$f_{prec}$', r'$\Omega - f_{prec}$', r'$\Omega$', r'$\alpha$',r'$2(\Omega - f_{prec})$']
-    heights = [0.02, 0.045, 0.038, 0.105, 0.06,0.03]
+    peaks = [7.63 ,8.18,14.32,15.25,16.36]  # Example peaks in frequency
+    labels = [r'$\Omega - f_{prec}$', r'$\Omega$','?',r'$2(\Omega - f_{prec}$)',r'$2\Omega$']
+    heights = [0.16,0.05,0.04,0.06,0.05]
     
     for peak, label, height in zip(peaks, labels, heights):
         peak_power = np.interp(peak, frequency, power)  # Find the power at the peak frequency
-        plt.annotate(label, xy=(peak, peak_power), xytext=(peak, height),
-                 textcoords='data', ha='center', fontsize=10)
+        plt.annotate(label, xy=(peak, height-0.01), xytext=(peak, height),
+                 textcoords='data', ha='center', fontsize=10,
+                 arrowprops=dict(arrowstyle='->',  # Draw a simple arrow
+            color='black',
+            lw=1.0            # Line width
+        ))
     
     plt.xlim(-0.5,20)
-    plt.ylim(0,0.12)
+    plt.ylim(0,0.2)
     
     # Set axis labels
     plt.xlabel('Frequency (c/d)')
@@ -426,7 +429,7 @@ def gaussian(x, a, mu, sigma):
     return a * np.exp(-0.5 * ((x - mu) / sigma)**2)
     
 
-def bootstrap_errors(time, flux, exptime, num_freqs=10000, num_bootstraps=1000, f_min = 7.5, f_max = 7.7):
+def bootstrap_errors(time, flux, exptime, num_freqs=10000, num_bootstraps=1000, f_min = 8.18, f_max = 8.2):
     # Stack time and flux for easier resampling
     time_flux_pairs = np.column_stack((time, flux))
     min_freq, max_freq = frequency_range(time, flux, exptime)
@@ -469,27 +472,43 @@ def bootstrap_errors(time, flux, exptime, num_freqs=10000, num_bootstraps=1000, 
     filtered_bin_centers = bin_centers[filter_mask]
     filtered_bin_heights = bin_heights[filter_mask]
     # Fit the Gaussian to the histogram
-    popt, pcov = curve_fit(gaussian, filtered_bin_centers, filtered_bin_heights, p0=[max(bin_heights), 7.62, 0.01])
     
-    # Extract the fitted parameters
-    a_fit, mu_fit, sigma_fit = popt    
-        
-    #plt.hist(peak_frequencies, bins=1000, alpha=0.5)
-    plt.step(filtered_bin_centers, filtered_bin_heights, where="mid", label="Peak Frequency Distribution", color="blue", alpha=0.7)
-    x_fit = np.linspace(f_min,f_max, 1500)
-    plt.plot(x_fit, gaussian(x_fit, *popt), label=f"Gaussian Fit\n$\mu$={mu_fit:.5f}, $\sigma$={sigma_fit:.5f}", color="red")
-    plt.xlim(f_min,f_max)
-    #plt.ylim(0,1500)
-    plt.xlabel("Peak Frequency")
-    plt.ylabel("Count")
-    plt.title("Distribution of Peak Frequencies")
-    plt.legend()
-    plt.show()
+    try:
+        popt, pcov = curve_fit(
+        gaussian, 
+        filtered_bin_centers, 
+        filtered_bin_heights, 
+        p0=[max(bin_heights),8.18, 0.01],
+        maxfev=2000  # optionally increase the max function evals
+    )
+    except RuntimeError:
+    # Could not find optimal parameters — handle it gracefully
+        popt, pcov = None, None
+        print("Warning: curve_fit failed to converge on a solution.")
 
-    print(f"Fitted Gaussian Parameters: a={a_fit:.5f}, mu={mu_fit:.5f}, sigma={sigma_fit:.5f}")
+# Now only do further processing if the fit succeeded
+    if popt is not None:
+        
+    
+        # Extract the fitted parameters
+        a_fit, mu_fit, sigma_fit = popt    
+            
+        #plt.hist(peak_frequencies, bins=1000, alpha=0.5)
+        plt.step(filtered_bin_centers, filtered_bin_heights, where="mid", label="Peak Frequency Distribution", color="blue", alpha=0.7)
+        x_fit = np.linspace(f_min,f_max, 1500)
+        plt.plot(x_fit, gaussian(x_fit, *popt), label=f"Gaussian Fit\n$\mu$={mu_fit:.5f}, $\sigma$={sigma_fit:.5f}", color="red")
+        plt.xlim(f_min,f_max)
+        #plt.ylim(0,1500)
+        plt.xlabel("Peak Frequency")
+        plt.ylabel("Count")
+        plt.title("Distribution of Peak Frequencies")
+        plt.legend()
+        plt.show()
+
+        print(f"Fitted Gaussian Parameters: a={a_fit:.5f}, mu={mu_fit:.5f}, sigma={sigma_fit:.5f}")
     return bin_centers,bin_heights, popt
 
-def bootstrap_errors_multiple(indices,f_min = 7.5,f_max = 7.7):
+def bootstrap_errors_multiple(indices,f_min = 8.4,f_max = 8.5):
     # Use lists instead of np.array for initial storage
     centres_array = []
     heights_array = []
@@ -512,10 +531,17 @@ def bootstrap_errors_multiple(indices,f_min = 7.5,f_max = 7.7):
 
     # Plotting multiple histograms and Gaussian fits
     fig, axes = plt.subplots(len(indices), 1, figsize=(8, len(indices) * 3), sharex=True)
-
+    sector_labels = ["Sector 43", "Sector 44", "Sector 70", "Sector 71"]
     for j in range(len(centres_array)):
+        
         ax = axes[j]
-
+        ax.text(
+        0.5, 0.9, sector_labels[j],
+        transform=ax.transAxes,  # so x, y are in [0..1] relative to Axes
+        fontsize=12, 
+        va='top',    # vertical alignment 
+        ha='center'    # horizontal alignment
+        )
         # Plot stepped histogram
         ax.step(
             centres_array[j],
@@ -528,34 +554,30 @@ def bootstrap_errors_multiple(indices,f_min = 7.5,f_max = 7.7):
 
         # Plot Gaussian fit
         x_fit = np.linspace(f_min, f_max, 1000)
-        a_fit, mu_fit, sigma_fit = popt_array[j]
-        ax.plot(
-            x_fit,
-            gaussian(x_fit, a_fit, mu_fit, sigma_fit),
-            label=f"Gaussian Fit\n$\\mu={mu_fit:.3f} \\pm {sigma_fit:.3f}$",
-            color=f"C{j}",
-        )
+        if popt is None:
+            # No valid fit, so just skip this plot
+            continue
+        else:
 
-        # Add labels and grid
-        ax.set_ylabel("RMS Power", fontsize=10)
-        ax.legend(fontsize=8)
-
-        # Annotate the mean and uncertainty
-        ax.text(
-            0.95,
-            0.85,
-            f"$\\mu={mu_fit:.2f}$\n$\\sigma={sigma_fit:.2f}$",
-            transform=ax.transAxes,
-            fontsize=8,
-            ha="right",
-            color=f"C{j}",
-        )
+        
+            a_fit, mu_fit, sigma_fit = popt_array[j]
+            ax.plot(
+                x_fit,
+                gaussian(x_fit, a_fit, mu_fit, sigma_fit),
+                label=f"Gaussian Fit\n$\\mu={mu_fit:.3f} \\pm {sigma_fit:.3f}$",
+                color=f"C{j}",
+                )   
+            
+            # Add labels and grid
+            ax.set_ylabel("RMS Power", fontsize=10)
+            ax.legend(fontsize=8)
+        
 
     # Finalize plot
     axes[-1].set_xlabel("Frequency [d$^{-1}$]", fontsize=10)
     plt.tight_layout()
     plt.show()
-    
+        
     stitch_flatten(indeces)
         
         
@@ -997,12 +1019,71 @@ def model_fit(time, flux, flux_error):
 
     return params, result.hess_inv, fitted_flux, chi2, reduced_chi2
 
+def dynamical_power_spec(time,flux,exptime,indeces,window_size,step_size):
+    min_freq,max_freq = 0.5,100
+    #min_freq, max_freq = frequency_range(time,flux,exptime)
+    # Compute the Lomb-Scargle Periodogram within the specified frequency range
+    num_frequency_points = 10000# You can adjust this based on the desired resolution
+    frequency = np.linspace(min_freq, max_freq, num_frequency_points)
+    ls = LombScargle(time, flux)
+    power = ls.power(frequency,normalization = "model")
+    plt.plot(frequency,power)
+    plt.xlabel("freq (1/d)")
+    plt.ylabel("power")
+    plt.show()
+    
+    t_min = time.min()
+    t_max = time.max()
+    
+    current_start = t_min
+    all_power_spectra = []
+    all_times = []
+    
+    while current_start + window_size <= t_max:
+        window_mask = (time >= current_start) & (time < current_start + window_size)
+        t_seg = time[window_mask]
+        f_seg = flux[window_mask]
+        print(len(t_seg))
+        if len(t_seg) < 2:
+            # Not enough data points
+            current_start += step_size
+            continue
+        
+        ls = LombScargle(time, flux)
+        power = ls.power(frequency)
+        # Store the computed power spectrum
+        all_power_spectra.append(power)
+        # Store the midpoint of the window (or start, depending on your choice)
+        all_times.append(current_start + window_size/2)
+        
+        current_start += step_size
+        
+    
+    power_matrix = np.array(all_power_spectra)  # shape ~ [number_of_windows, number_of_frequencies]
+    
+    plt.figure(figsize=(8, 6))
+    # times on x-axis, frequency on y-axis
+    plt.imshow(
+    power_matrix.T, 
+    aspect='auto',
+    origin='lower',
+    extent=[all_times[0], all_times[-1], frequency[0], frequency[-1]],
+    cmap='inferno',
+    )  # adjust these as needed
+
+    plt.xlabel("Time (BJD - offset) [days]")
+    plt.ylabel("Frequency [1/day]")
+    plt.title("Dynamical Power Spectrum")
+    plt.colorbar(label="Power")
+    plt.show()
+    
+
 indexes = [0,1]
 indeces = [0,1,2,3]
 
-#flux_stitched, time_stitched, exptime_stitched = stitch_flatten(indeces)
+flux_stitched, time_stitched, exptime_stitched = stitch_flatten(indeces)
 #Lomb_Scargle(time_stitched, flux_stitched, exptime_stitched)
-
+dynamical_power_spec(time_stitched,flux_stitched,exptime_stitched,indeces,3,5)
 
 #XMM_test()
 #flux,time = XMM_time_series()
@@ -1011,27 +1092,29 @@ indeces = [0,1,2,3]
 #time,flux,exptime, flux_error = Kepler_data(indexes[0])
 #Lomb_Scargle(time,flux,exptime)
 
+
+#time,flux,exptime,flux_error = sector_data(indeces[2])
 #multiple_LC_plot(indexes)
 #times, fluxes, orbitals, spins, news = mulitple_sector_LS(indexes)
-#peak_frequencies = np.array([11])
+#peak_frequencies = np.array([8.18])
 #phase_fold_binned(time, flux, peak_frequencies)
 
 
-time,flux,exptime,flux_error = sector_data(indeces[0])
+time,flux,exptime,flux_error = sector_data(indeces[2])
 #bootstrap_lomb_scargle(time, flux)
 #bootstrap_errors(time, flux, exptime)
 #bootstrap_errors_multiple(indeces)
 #Lomb_Scargle(time, flux, exptime)
-Lomb_Scargle_Annotated(time, flux, exptime)
+#Lomb_Scargle_Annotated(time, flux, exptime)
 
 #frequency,power,peak_frequencies,peak_powers = Lomb_Scargle(time,flux,exptime)
 #peak_classification(frequency,power,peak_frequencies,peak_powers)
 window_size = 0.3  # Window size in the same units as time (e.g., days or minutes)
 step_size = 5  # Step size for sliding the window
-min_freq = 5  # Minimum frequency (cycles/day)
+min_freq = 0  # Minimum frequency (cycles/day)
 max_freq = 40  # Maximum frequency (cycles/day)
 
 # Call the function with your time, flux, and exptime data
-#Lomb_Scargle_2D(time, flux, exptime, window_size, step_size, min_freq, max_freq)
+Lomb_Scargle_2D(time, flux, exptime, window_size, step_size, min_freq, max_freq)
 #model_fit(time,flux,flux_error)
 #MCMC_Fit(time,flux,flux_error)
