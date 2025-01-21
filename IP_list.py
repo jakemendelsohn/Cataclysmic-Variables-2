@@ -118,7 +118,7 @@ def find_consecutive_bursts(flux, threshold, min_consecutive=4):
     return list(burst_indices)  # Ensure it's a list
 
 def specific_file():
-    file = "C:/Users/jakem/OneDrive/Documents/Year 4 Project/Compiled ASASSN Data/IPs_ASAS-SN_data/IPs_ASAS-SN_data/UU_Col_ASAS-SN_LC.csv"
+    file = "C:/Users/jakem/OneDrive/Documents/Year 4 Project/Compiled ASASSN Data/IPs_ASAS-SN_data/IPs_ASAS-SN_data/AX_J1853.3_ASAS-SN_LC.csv"
     df = pd.read_csv(file)
     time = df.iloc[:, 0]
     time = time-2457000
@@ -191,6 +191,7 @@ def flux_to_luminosity(flux, distance, band):
         flux_erg_cm2 = flux_erg_cm2_Hz*band_centre
         lum_erg = flux_erg_cm2*distance
         
+      
     if band == 'g':
         band_centre = 6.7*10**(14)
         flux_Jy = flux*10**(-3)
@@ -198,15 +199,16 @@ def flux_to_luminosity(flux, distance, band):
         flux_erg_cm2 = flux_erg_cm2_Hz*band_centre
         lum_erg = flux_erg_cm2*distance
         
+    
     return lum_erg
         
     
 def burst_focus(time_mask_V2,flux_mask_V2, flux_error_mask_V2, time_mask_g2,flux_mask_g2,flux_error_mask_g2,distance,band):
-    t_lower = 2855
-    t_upper = 2900
+    t_lower = 1680
+    t_upper = 1710
     
     lum_erg_total_g = flux_to_luminosity(flux_mask_g2, distance, 'g')
-    lum_erg_total_V = flux_to_luminosity(flux_mask_V2, distance, 'V')
+    lum_erg_total_V= flux_to_luminosity(flux_mask_V2, distance, 'V')
     
     # Create masks (True/False arrays) indicating which points fall within [t_lower, t_upper]
     mask_V = (time_mask_V2 >= t_lower) & (time_mask_V2 <= t_upper)
@@ -227,6 +229,8 @@ def burst_focus(time_mask_V2,flux_mask_V2, flux_error_mask_V2, time_mask_g2,flux
     lum_erg_V = flux_to_luminosity(filtered_flux_V2, distance, 'V')
     lum_err_V = flux_to_luminosity(filtered_flux_err_V2, distance, 'V')
     
+
+    
     average_g = np.mean(lum_erg_total_g)
     average_V = np.mean(lum_erg_total_V)
     
@@ -239,7 +243,7 @@ def burst_focus(time_mask_V2,flux_mask_V2, flux_error_mask_V2, time_mask_g2,flux
         
         
         
-        threshold = average_g*3
+        threshold = average_g*1.2
         print("Threshold is", threshold)
         threshold_line = np.linspace(threshold,threshold,len(filtered_time_g2))
         
@@ -252,7 +256,7 @@ def burst_focus(time_mask_V2,flux_mask_V2, flux_error_mask_V2, time_mask_g2,flux
             outburst_duration = t_end - t_start
             error1 = t_start - filtered_time_g2[above_threshold[0]-1]
             #error2 = filtered_time_g2[above_threshold[-1]+1]-t_end
-           # error_tot = error1+error2
+            #error_tot = error1+error2
             #print("Outburst duration:", outburst_duration, "+-",error_tot, "days")
         
         start = np.where(filtered_time_g2 == t_start)[0]
@@ -272,7 +276,7 @@ def burst_focus(time_mask_V2,flux_mask_V2, flux_error_mask_V2, time_mask_g2,flux
         
         for i in range(N_sims):
             # draw a noisy realization of the luminosities
-            L_noisy = lum_burst_g + np.random.normal(loc=0.0, scale=lum_err_burst_g)
+            L_noisy = (lum_burst_g-average_g) + np.random.normal(loc=0.0, scale=lum_err_burst_g)
             # integrate using trapezoid rule
             integrated_values[i] = np.trapz(L_noisy, time_burst_g)
             
@@ -317,7 +321,7 @@ def burst_focus(time_mask_V2,flux_mask_V2, flux_error_mask_V2, time_mask_g2,flux
     if band == "V":
         x_average_V = np.linspace(min(filtered_time_V2),max(filtered_time_V2),500)
         y_average_V = np.linspace(average_V,average_V,500)
-        threshold = average_V*1.4
+        threshold = average_V*1.5
         print("Threshold is", threshold)
         threshold_line = np.linspace(threshold,threshold,len(filtered_time_V2))
 
@@ -330,9 +334,9 @@ def burst_focus(time_mask_V2,flux_mask_V2, flux_error_mask_V2, time_mask_g2,flux
             t_end = filtered_time_V2[above_threshold[-1]]
             outburst_duration = t_end - t_start
             error1 = t_start - filtered_time_V2[above_threshold[0]-1]
-            error2 = filtered_time_V2[above_threshold[-1]+1]-t_end
-            error_tot = error1+error2
-            print("Outburst duration:", outburst_duration, "+-",error_tot, "days")
+            #error2 = filtered_time_V2[above_threshold[-1]+1]-t_end
+            #error_tot = error1+error2
+            #print("Outburst duration:", outburst_duration, "+-",error_tot, "days")
         
         start = np.where(filtered_time_V2 == t_start)[0]
         end = np.where(filtered_time_V2 == t_end)[0]
@@ -349,14 +353,10 @@ def burst_focus(time_mask_V2,flux_mask_V2, flux_error_mask_V2, time_mask_g2,flux
         lum_err_burst_V = lum_err_burst_V.astype(float)
         
         for i in range(N_sims):
-            # draw a noisy realization of the luminosities
-            L_noisy = lum_burst_V + np.random.normal(loc=0.0, scale=lum_err_burst_V)
-            # integrate using trapezoid rule
+            L_noisy = (lum_burst_V-average_V) + np.random.normal(loc=0.0, scale=lum_err_burst_V)
             integrated_values[i] = np.trapz(L_noisy, time_burst_V)
             
-        # Mean integrated energy:
         E_mean = np.mean(integrated_values)
-        # 1-sigma error (standard deviation of the distribution):
         E_std  = np.std(integrated_values)
             
         print(f"Monte Carlo mean energy = {E_mean:.2e} erg ± {E_std:.2e} erg (1σ)")
@@ -517,13 +517,28 @@ def new_data():
 def comparison_plot():
     names_micro1, peak_micro1, peak_error_micro1, total_en_micro1, total_en_error_micro1, duration_micro1, duration_error_micro1, names_donor1, peak_donor1, peak_error_donor1, total_en_donor1, total_en_error_donor1, duration_donor1, duration_error_donor1,names_gating1, peak_gating1, peak_error_gating1, total_en_gating1, total_en_error_gating1, duration_gating1, duration_error_gating1, names_dwarf1,peak_dwarf1,peak_error_dwarf1, total_en_dwarf1,total_en_error_dwarf1,duration_dwarf1,duration_error_dwarf1 = literature_data()
     names_micro, peak_micro, peak_error_micro, total_en_micro, total_en_error_micro, duration_micro, duration_error_micro,names_donor, peak_donor, peak_error_donor, total_en_donor, total_en_error_donor, duration_donor, duration_error_donor,names_gating, peak_gating, peak_error_gating, total_en_gating, total_en_error_gating, duration_gating, duration_error_gating, names_dwarf,peak_dwarf,peak_error_dwarf, total_en_dwarf,total_en_error_dwarf,duration_dwarf,duration_error_dwarf = new_data()
-    plt.scatter(total_en_micro,peak_micro,label = "Micronovae (new)",color = "blue",s=20, marker='^')
-    plt.scatter(total_en_dwarf,peak_dwarf,label = "Dwarf Novae (new)", color = "red",s=20, marker='^')
+    plt.errorbar(total_en_micro, peak_micro, xerr=total_en_error_micro, yerr=peak_error_micro, label="Micronovae (new)", color="blue", markersize=5, fmt='^',elinewidth=0.5)
+    plt.errorbar(total_en_dwarf, peak_dwarf, xerr=total_en_error_dwarf, yerr=peak_error_dwarf, label="Dwarf Novae (new)", color="red", markersize=5, fmt='^',elinewidth=0.5)
     
     
-    plt.scatter(total_en_micro1,peak_micro1,label = "Micronovae",color = "blue",s=20, marker = '*')
-    plt.scatter(total_en_dwarf1,peak_dwarf1,label = "Dwarf Novae", color = "red",s=20, marker = '*')
-    plt.scatter(total_en_gating1,peak_gating1, label = "Magnetic Gating", color = "yellow", s=20, marker = '*')
+    plt.errorbar(total_en_micro1,peak_micro1,xerr = total_en_error_micro1, yerr= peak_error_micro1,label = "Micronovae",color = "blue",markersize=5, fmt = '*',elinewidth=0.5)
+    plt.errorbar(total_en_dwarf1, peak_dwarf1,xerr=total_en_error_dwarf1, yerr=peak_error_dwarf1,label="Dwarf Novae", color="red", markersize=5, fmt='*',elinewidth=0.5)
+    plt.errorbar(total_en_gating1, peak_gating1,xerr=total_en_error_gating1, yerr=peak_error_gating1,label="Magnetic Gating", color="yellow", markersize=5, fmt='*',elinewidth=0.5)
+
+    plt.xlabel("Total Optical Energy (erg)")
+    plt.ylabel("Peak Optical Luminosity (erg/s)")
+    plt.xscale('log')
+    plt.yscale('log')
+    plt.legend()
+    plt.show()
+    
+    plt.errorbar(total_en_micro, duration_micro, xerr=total_en_error_micro, yerr=duration_error_micro, label="Micronovae (new)", color="blue", fmt='^', markersize=5, elinewidth=0.5, capsize=2, capthick=0.5)
+    plt.errorbar(total_en_dwarf, duration_dwarf, xerr=total_en_error_dwarf, yerr=duration_error_dwarf, label="Dwarf Novae (new)", color="red", fmt='^', markersize=5, elinewidth=0.5, capsize=2, capthick=0.5)
+    plt.errorbar(total_en_micro1, duration_micro1, xerr=total_en_error_micro1, yerr=duration_error_micro1, label="Micronovae", color="blue", fmt='*', markersize=5, elinewidth=0.5, capsize=2, capthick=0.5)
+    plt.errorbar(total_en_dwarf1, duration_dwarf1, xerr=total_en_error_dwarf1, yerr=duration_error_dwarf1, label="Dwarf Novae", color="red", fmt='*', markersize=5, elinewidth=0.5, capsize=2, capthick=0.5)
+    plt.errorbar(total_en_gating1, duration_gating1, xerr=total_en_error_gating1, yerr=duration_error_gating1, label="Magnetic Gating", color="yellow", fmt='*', markersize=5, elinewidth=0.5, capsize=2, capthick=0.5)
+    plt.xlabel("Total Optical Energy (erg)")
+    plt.ylabel("Burst Duration (d)")
     plt.xscale('log')
     plt.yscale('log')
     plt.legend()
@@ -531,7 +546,7 @@ def comparison_plot():
     
 #read_files()
 #time_mask_V2,flux_mask_V2, flux_error_mask_V2, time_mask_g2,flux_mask_g2,flux_error_mask_g2 = specific_file()
-#burst_focus(time_mask_V2,flux_mask_V2, flux_error_mask_V2, time_mask_g2,flux_mask_g2,flux_error_mask_g2, 4.506*10**(44), 'g')
+#burst_focus(time_mask_V2,flux_mask_V2, flux_error_mask_V2, time_mask_g2,flux_mask_g2,flux_error_mask_g2,5.844*10**(42), 'g')
 #literature_data()
 #new_data()
 comparison_plot()
