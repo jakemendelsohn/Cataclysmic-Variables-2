@@ -118,7 +118,7 @@ def find_consecutive_bursts(flux, threshold, min_consecutive=4):
     return list(burst_indices)  # Ensure it's a list
 
 def specific_file():
-    file = "C:/Users/jakem/OneDrive/Documents/Year 4 Project/Compiled ASASSN Data/IPs_ASAS-SN_data/IPs_ASAS-SN_data/AX_J1853.3_ASAS-SN_LC.csv"
+    file = "C:/Users/jakem/Downloads/light_curve_bfd79435-3941-4c8b-b9b2-f2031a686e23.csv"
     df = pd.read_csv(file)
     time = df.iloc[:, 0]
     time = time-2457000
@@ -204,8 +204,8 @@ def flux_to_luminosity(flux, distance, band):
         
     
 def burst_focus(time_mask_V2,flux_mask_V2, flux_error_mask_V2, time_mask_g2,flux_mask_g2,flux_error_mask_g2,distance,band):
-    t_lower = 1680
-    t_upper = 1710
+    t_lower = 2275
+    t_upper = 2325
     
     lum_erg_total_g = flux_to_luminosity(flux_mask_g2, distance, 'g')
     lum_erg_total_V= flux_to_luminosity(flux_mask_V2, distance, 'V')
@@ -229,10 +229,12 @@ def burst_focus(time_mask_V2,flux_mask_V2, flux_error_mask_V2, time_mask_g2,flux
     lum_erg_V = flux_to_luminosity(filtered_flux_V2, distance, 'V')
     lum_err_V = flux_to_luminosity(filtered_flux_err_V2, distance, 'V')
     
+    
 
     
     average_g = np.mean(lum_erg_total_g)
     average_V = np.mean(lum_erg_total_V)
+    
     
     if band == 'g':
     
@@ -255,9 +257,9 @@ def burst_focus(time_mask_V2,flux_mask_V2, flux_error_mask_V2, time_mask_g2,flux
             t_end = filtered_time_g2[above_threshold[-1]]
             outburst_duration = t_end - t_start
             error1 = t_start - filtered_time_g2[above_threshold[0]-1]
-            #error2 = filtered_time_g2[above_threshold[-1]+1]-t_end
-            #error_tot = error1+error2
-            #print("Outburst duration:", outburst_duration, "+-",error_tot, "days")
+            error2 = filtered_time_g2[above_threshold[-1]+1]-t_end
+            error_tot = error1+error2
+            print("Outburst duration:", outburst_duration, "+-",error_tot, "days")
         
         start = np.where(filtered_time_g2 == t_start)[0]
         end = np.where(filtered_time_g2 == t_end)[0]
@@ -461,6 +463,7 @@ def new_data():
     total_energy_err = df['Total Energy Error (erg)'].to_numpy()
     duration = df['Duration (d)'].to_numpy()
     duration_err = df['Duration Error (d)'].to_numpy()
+
     
     df_dwarf = df[df["Type"] == "Dwarf nova"]
     df_micro = df[df["Type"] == "Micronova"]
@@ -475,9 +478,9 @@ def new_data():
     total_en_error_dwarf = df_dwarf['Total Energy Error (erg)'].to_numpy()
     duration_dwarf = df_dwarf['Duration (d)'].to_numpy()
     duration_error_dwarf = df_dwarf['Duration Error (d)'].to_numpy()
-    
-    print(len(total_en_dwarf))
-    print(len(peak_dwarf))
+    P_orb_dwarf = df_dwarf['P_orb (h)'].to_numpy()
+    P_spin_dwarf = df_dwarf['P_spin (s)'].to_numpy()
+
     
     names_micro = df_micro["Name"].to_numpy()
     peak_micro = df_micro["Peak Luminosity (erg/s)"].to_numpy()
@@ -486,6 +489,8 @@ def new_data():
     total_en_error_micro = df_micro['Total Energy Error (erg)'].to_numpy()
     duration_micro = df_micro['Duration (d)'].to_numpy()
     duration_error_micro = df_micro['Duration Error (d)'].to_numpy()
+    P_orb_micro = df_micro['P_orb (h)'].to_numpy()
+    P_spin_micro = df_micro['P_spin (s)'].to_numpy()
     
     names_donor = df_donor["Name"].to_numpy()
     peak_donor = df_donor["Peak Luminosity (erg/s)"].to_numpy()
@@ -502,28 +507,24 @@ def new_data():
     total_en_error_gating = df_gating['Total Energy Error (erg)'].to_numpy()
     duration_gating = df_gating['Duration (d)'].to_numpy()
     duration_error_gating = df_gating['Duration Error (d)'].to_numpy()
+    P_orb_gating = df_gating['P_orb (h)'].to_numpy()
+    P_spin_gating = df_gating['P_spin (s)'].to_numpy()
     
-    plt.scatter(total_en_micro,peak_micro,label = "Micronovae",color = "blue",s=5)
-    plt.scatter(total_en_dwarf,peak_dwarf,label = "Dwarf Novae", color = "red",s=5)
-    plt.xscale('log')
-    plt.yscale('log')
-    plt.legend()
-    plt.show()
     
-    return (names_micro, peak_micro, peak_error_micro, total_en_micro, total_en_error_micro, duration_micro, duration_error_micro,
+    return (names_micro, peak_micro, peak_error_micro, total_en_micro, total_en_error_micro, duration_micro, duration_error_micro, P_orb_micro, P_spin_micro,
         names_donor, peak_donor, peak_error_donor, total_en_donor, total_en_error_donor, duration_donor, duration_error_donor,
-        names_gating, peak_gating, peak_error_gating, total_en_gating, total_en_error_gating, duration_gating, duration_error_gating, names_dwarf,peak_dwarf,peak_error_dwarf, total_en_dwarf,total_en_error_dwarf,duration_dwarf,duration_error_dwarf)
+        names_gating, peak_gating, peak_error_gating, total_en_gating, total_en_error_gating, duration_gating, duration_error_gating, P_orb_gating, P_spin_gating,names_dwarf,peak_dwarf,peak_error_dwarf, total_en_dwarf,total_en_error_dwarf,duration_dwarf,duration_error_dwarf, P_orb_dwarf, P_spin_dwarf)
     
 def comparison_plot():
     names_micro1, peak_micro1, peak_error_micro1, total_en_micro1, total_en_error_micro1, duration_micro1, duration_error_micro1, names_donor1, peak_donor1, peak_error_donor1, total_en_donor1, total_en_error_donor1, duration_donor1, duration_error_donor1,names_gating1, peak_gating1, peak_error_gating1, total_en_gating1, total_en_error_gating1, duration_gating1, duration_error_gating1, names_dwarf1,peak_dwarf1,peak_error_dwarf1, total_en_dwarf1,total_en_error_dwarf1,duration_dwarf1,duration_error_dwarf1 = literature_data()
-    names_micro, peak_micro, peak_error_micro, total_en_micro, total_en_error_micro, duration_micro, duration_error_micro,names_donor, peak_donor, peak_error_donor, total_en_donor, total_en_error_donor, duration_donor, duration_error_donor,names_gating, peak_gating, peak_error_gating, total_en_gating, total_en_error_gating, duration_gating, duration_error_gating, names_dwarf,peak_dwarf,peak_error_dwarf, total_en_dwarf,total_en_error_dwarf,duration_dwarf,duration_error_dwarf = new_data()
-    plt.errorbar(total_en_micro, peak_micro, xerr=total_en_error_micro, yerr=peak_error_micro, label="Micronovae (new)", color="blue", markersize=5, fmt='^',elinewidth=0.5)
-    plt.errorbar(total_en_dwarf, peak_dwarf, xerr=total_en_error_dwarf, yerr=peak_error_dwarf, label="Dwarf Novae (new)", color="red", markersize=5, fmt='^',elinewidth=0.5)
+    names_micro, peak_micro, peak_error_micro, total_en_micro, total_en_error_micro, duration_micro, duration_error_micro,P_orb_micro, P_spin_micro,names_donor, peak_donor, peak_error_donor, total_en_donor, total_en_error_donor, duration_donor, duration_error_donor,names_gating, peak_gating, peak_error_gating, total_en_gating, total_en_error_gating, duration_gating, duration_error_gating, P_orb_gating,P_spin_gating,names_dwarf,peak_dwarf,peak_error_dwarf, total_en_dwarf,total_en_error_dwarf,duration_dwarf,duration_error_dwarf,P_orb_dwarf,P_spin_dwarf = new_data()
+    plt.errorbar(total_en_micro, peak_micro, xerr=total_en_error_micro, yerr=peak_error_micro, label="Micronovae (new)", color="blue", markersize=6, fmt='^',elinewidth=0.5)
+    plt.errorbar(total_en_dwarf, peak_dwarf, xerr=total_en_error_dwarf, yerr=peak_error_dwarf, label="Dwarf Novae (new)", color="red", markersize=6, fmt='^',elinewidth=0.5)
     
     
-    plt.errorbar(total_en_micro1,peak_micro1,xerr = total_en_error_micro1, yerr= peak_error_micro1,label = "Micronovae",color = "blue",markersize=5, fmt = '*',elinewidth=0.5)
-    plt.errorbar(total_en_dwarf1, peak_dwarf1,xerr=total_en_error_dwarf1, yerr=peak_error_dwarf1,label="Dwarf Novae", color="red", markersize=5, fmt='*',elinewidth=0.5)
-    plt.errorbar(total_en_gating1, peak_gating1,xerr=total_en_error_gating1, yerr=peak_error_gating1,label="Magnetic Gating", color="yellow", markersize=5, fmt='*',elinewidth=0.5)
+    plt.errorbar(total_en_micro1,peak_micro1,xerr = total_en_error_micro1, yerr= peak_error_micro1,label = "Micronovae",color = "blue",markersize=6, fmt = 'o',elinewidth=0.5)
+    plt.errorbar(total_en_dwarf1, peak_dwarf1,xerr=total_en_error_dwarf1, yerr=peak_error_dwarf1,label="Dwarf Novae", color="red", markersize=6, fmt='o',elinewidth=0.5)
+    plt.errorbar(total_en_gating1, peak_gating1,xerr=total_en_error_gating1, yerr=peak_error_gating1,label="Magnetic Gating", color="yellow", markersize=6, fmt='o',elinewidth=0.5)
 
     plt.xlabel("Total Optical Energy (erg)")
     plt.ylabel("Peak Optical Luminosity (erg/s)")
@@ -532,11 +533,11 @@ def comparison_plot():
     plt.legend()
     plt.show()
     
-    plt.errorbar(total_en_micro, duration_micro, xerr=total_en_error_micro, yerr=duration_error_micro, label="Micronovae (new)", color="blue", fmt='^', markersize=5, elinewidth=0.5, capsize=2, capthick=0.5)
-    plt.errorbar(total_en_dwarf, duration_dwarf, xerr=total_en_error_dwarf, yerr=duration_error_dwarf, label="Dwarf Novae (new)", color="red", fmt='^', markersize=5, elinewidth=0.5, capsize=2, capthick=0.5)
-    plt.errorbar(total_en_micro1, duration_micro1, xerr=total_en_error_micro1, yerr=duration_error_micro1, label="Micronovae", color="blue", fmt='*', markersize=5, elinewidth=0.5, capsize=2, capthick=0.5)
-    plt.errorbar(total_en_dwarf1, duration_dwarf1, xerr=total_en_error_dwarf1, yerr=duration_error_dwarf1, label="Dwarf Novae", color="red", fmt='*', markersize=5, elinewidth=0.5, capsize=2, capthick=0.5)
-    plt.errorbar(total_en_gating1, duration_gating1, xerr=total_en_error_gating1, yerr=duration_error_gating1, label="Magnetic Gating", color="yellow", fmt='*', markersize=5, elinewidth=0.5, capsize=2, capthick=0.5)
+    plt.errorbar(total_en_micro, duration_micro, xerr=total_en_error_micro, yerr=duration_error_micro, label="Micronovae (new)", color="blue", fmt='^', markersize=6, elinewidth=0.5, capsize=2, capthick=0.5)
+    plt.errorbar(total_en_dwarf, duration_dwarf, xerr=total_en_error_dwarf, yerr=duration_error_dwarf, label="Dwarf Novae (new)", color="red", fmt='^', markersize=6, elinewidth=0.5, capsize=2, capthick=0.5)
+    plt.errorbar(total_en_micro1, duration_micro1, xerr=total_en_error_micro1, yerr=duration_error_micro1, label="Micronovae", color="blue", fmt='o', markersize=6, elinewidth=0.5, capsize=2, capthick=0.5)
+    plt.errorbar(total_en_dwarf1, duration_dwarf1, xerr=total_en_error_dwarf1, yerr=duration_error_dwarf1, label="Dwarf Novae", color="red", fmt='o', markersize=6, elinewidth=0.5, capsize=2, capthick=0.5)
+    plt.errorbar(total_en_gating1, duration_gating1, xerr=total_en_error_gating1, yerr=duration_error_gating1, label="Magnetic Gating", color="yellow", fmt='o', markersize=6, elinewidth=0.5, capsize=2, capthick=0.5)
     plt.xlabel("Total Optical Energy (erg)")
     plt.ylabel("Burst Duration (d)")
     plt.xscale('log')
@@ -544,9 +545,60 @@ def comparison_plot():
     plt.legend()
     plt.show()
     
+    print(P_orb_dwarf)
+    
+    plt.scatter(P_orb_dwarf,P_spin_dwarf,s=5, color = 'blue', label = "Dwarf Nova")
+    plt.scatter(P_orb_micro,P_spin_micro,s=5, color = 'red', label = "Micronova")
+    plt.scatter(P_orb_gating,P_spin_gating,s=5, color = 'yellow', label = "Magnetic Gating")
+    
+    xvals = np.linspace(1,20, 100)
+
+    # Lines:
+    yvals_equal = xvals * 3600              # P_spin = P_orb
+    yvals_tenth = 0.1 * xvals * 3600        # P_spin = 0.1 * P_orb
+        
+    plt.scatter(P_orb_dwarf, P_spin_dwarf, s=5, color='blue', label="Dwarf Nova")
+    # ... likewise for micronova and magnetic gating ...
+    plt.plot(xvals, yvals_equal, '--k',  color = 'black')
+    plt.plot(xvals, yvals_tenth, '--g', color = 'black')
+    
+    # Pick a point in the middle of your x‐range:
+    xmid = xvals[len(xvals)//2]
+    ymid = yvals_equal[len(xvals)//2]
+        
+        # Add text right at (xmid, ymid).  No arrowprops needed.
+    plt.annotate(
+    r"$P_{\mathrm{spin}} = P_{\mathrm{orb}}$",   # LaTeX math‐mode label
+    xy=(xmid, ymid),                            # Location in data coords
+    xytext=(0, 0),                              # No offset
+    textcoords='offset points',                 # Interpret xytext as an offset
+    ha='center', va='bottom',                   # Centre the text horizontally
+    fontsize=10, color='black'
+    )
+
+    # Similarly for P_spin = 0.1 P_orb:
+    xmid_01 = xvals[len(xvals)//2]
+    ymid_01 = 0.2 * xmid_01 * 3600
+
+    plt.annotate(
+    r"$P_{\mathrm{spin}} = 0.1\,P_{\mathrm{orb}}$",
+    xy=(xmid_01, ymid_01),
+    xytext=(0, 0),
+    textcoords='offset points',
+    ha='center', va='bottom',
+    fontsize = 10, color = 'black')
+    
+    
+    plt.xscale('log')
+    plt.yscale('log')
+    plt.legend(loc = 'upper left')
+    plt.xlabel("Orbital Period (hrs)")
+    plt.ylabel("Spin Period (s)")
+    plt.show()
+    
 #read_files()
-#time_mask_V2,flux_mask_V2, flux_error_mask_V2, time_mask_g2,flux_mask_g2,flux_error_mask_g2 = specific_file()
-#burst_focus(time_mask_V2,flux_mask_V2, flux_error_mask_V2, time_mask_g2,flux_mask_g2,flux_error_mask_g2,5.844*10**(42), 'g')
+time_mask_V2,flux_mask_V2, flux_error_mask_V2, time_mask_g2,flux_mask_g2,flux_error_mask_g2 = specific_file()
+#burst_focus(time_mask_V2,flux_mask_V2, flux_error_mask_V2, time_mask_g2,flux_mask_g2,flux_error_mask_g2,2.728*10**(44), 'g')
 #literature_data()
 #new_data()
 comparison_plot()
