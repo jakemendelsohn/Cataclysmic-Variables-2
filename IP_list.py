@@ -34,12 +34,13 @@ def read_files():
             print(f"Processing file: {file}")
             file_path = os.path.join(os.getcwd(), file)
             df = pd.read_csv(file_path)  # Read each file
+            df = df[df['mag_err'] != 99.99]
             time = df.iloc[:, 0]
             time = time-2457000
             flux = df.iloc[:, 7]
             band = df.iloc[:, 9]
-            indices_V = [i for i in range(len(band)) if band[i] == 'V']
-            indices_g = [h for h in range(len(band)) if band[h] == 'g']
+            indices_V = [i for i in range(len(band)) if band.iloc[i] == 'V']
+            indices_g = [h for h in range(len(band)) if band.iloc[h] == 'g']
             
             time_mask_V = []
             flux_mask_V = []
@@ -52,8 +53,8 @@ def read_files():
             
             
             for j in range(0,len(indices_V)):
-                time_mask_V.append(time[indices_V[j]])
-                flux_mask_V.append(flux[indices_V[j]])
+                time_mask_V.append(time.iloc[indices_V[j]])
+                flux_mask_V.append(flux.iloc[indices_V[j]])
                 
             indices_cutoff_V = [f for f in range(len(flux_mask_V)) if flux_mask_V[f]<95]
             
@@ -62,8 +63,8 @@ def read_files():
                 flux_mask_V2.append(flux_mask_V[indices_cutoff_V[i]])
             
             for k in range(0,len(indices_g)):
-                time_mask_g.append(time[indices_g[k]])
-                flux_mask_g.append(flux[indices_g[k]])
+                time_mask_g.append(time.iloc[indices_g[k]])
+                flux_mask_g.append(flux.iloc[indices_g[k]])
                 
             indices_cutoff_g = [f for f in range(len(flux_mask_g)) if flux_mask_g[f]<95]
             
@@ -118,15 +119,16 @@ def find_consecutive_bursts(flux, threshold, min_consecutive=4):
     return list(burst_indices)  # Ensure it's a list
 
 def specific_file():
-    file = "C:/Users/jakem/Downloads/light_curve_bfd79435-3941-4c8b-b9b2-f2031a686e23.csv"
+    file = 'C:/Users/jakem/OneDrive/Documents/Year 4 Project/Compiled ASASSN Data/IPs_ASAS-SN_data/IPs_ASAS-SN_data/V1025_Cen_ASAS-SN_LC.csv'
     df = pd.read_csv(file)
+    df = df[df['mag_err'] != 99.99]
     time = df.iloc[:, 0]
     time = time-2457000
     flux = df.iloc[:, 7]
     band = df.iloc[:, 9]
     flux_error = df.iloc[:, 8]
-    indices_V = [i for i in range(len(band)) if band[i] == 'V']
-    indices_g = [h for h in range(len(band)) if band[h] == 'g']
+    indices_V = [i for i in range(len(band)) if band.iloc[i] == 'V']
+    indices_g = [h for h in range(len(band)) if band.iloc[h] == 'g']
     
     time_mask_V = []
     flux_mask_V = []
@@ -143,9 +145,9 @@ def specific_file():
     
     
     for j in range(0,len(indices_V)):
-        time_mask_V.append(time[indices_V[j]])
-        flux_mask_V.append(flux[indices_V[j]])
-        flux_error_mask_V.append(flux_error[indices_V[j]])
+        time_mask_V.append(time.iloc[indices_V[j]])
+        flux_mask_V.append(flux.iloc[indices_V[j]])
+        flux_error_mask_V.append(flux_error.iloc[indices_V[j]])
         
     indices_cutoff_V = [f for f in range(len(flux_mask_V)) if flux_mask_V[f]<95]
     
@@ -155,9 +157,9 @@ def specific_file():
         flux_error_mask_V2.append(flux_error_mask_V[indices_cutoff_V[i]])
     
     for k in range(0,len(indices_g)):
-        time_mask_g.append(time[indices_g[k]])
-        flux_mask_g.append(flux[indices_g[k]])
-        flux_error_mask_g.append(flux_error[indices_g[k]])
+        time_mask_g.append(time.iloc[indices_g[k]])
+        flux_mask_g.append(flux.iloc[indices_g[k]])
+        flux_error_mask_g.append(flux_error.iloc[indices_g[k]])
         
     indices_cutoff_g = [f for f in range(len(flux_mask_g)) if flux_mask_g[f]<95]
     
@@ -204,8 +206,8 @@ def flux_to_luminosity(flux, distance, band):
         
     
 def burst_focus(time_mask_V2,flux_mask_V2, flux_error_mask_V2, time_mask_g2,flux_mask_g2,flux_error_mask_g2,distance,band):
-    t_lower = 2275
-    t_upper = 2325
+    t_lower = 1300
+    t_upper = 1600
     
     lum_erg_total_g = flux_to_luminosity(flux_mask_g2, distance, 'g')
     lum_erg_total_V= flux_to_luminosity(flux_mask_V2, distance, 'V')
@@ -245,7 +247,7 @@ def burst_focus(time_mask_V2,flux_mask_V2, flux_error_mask_V2, time_mask_g2,flux
         
         
         
-        threshold = average_g*1.2
+        threshold = average_g*1.8
         print("Threshold is", threshold)
         threshold_line = np.linspace(threshold,threshold,len(filtered_time_g2))
         
@@ -253,13 +255,19 @@ def burst_focus(time_mask_V2,flux_mask_V2, flux_error_mask_V2, time_mask_g2,flux
         if len(above_threshold) == 0:
             print("No points above threshold — no outburst detected.")
         else:
-            t_start = filtered_time_g2[above_threshold[0]]
-            t_end = filtered_time_g2[above_threshold[-1]]
+            t_start = filtered_time_g2[above_threshold[0]-1]
+            t_end = filtered_time_g2[above_threshold[-1]+1]
             outburst_duration = t_end - t_start
-            error1 = t_start - filtered_time_g2[above_threshold[0]-1]
-            error2 = filtered_time_g2[above_threshold[-1]+1]-t_end
-            error_tot = error1+error2
-            print("Outburst duration:", outburst_duration, "+-",error_tot, "days")
+            print("Duration Upper Limit", outburst_duration)
+            
+            t_start_lower = filtered_time_g2[above_threshold[0]]
+            t_end_lower = filtered_time_g2[above_threshold[-1]]
+            duration_lower = t_end_lower - t_start_lower
+            print("Duration Lower Limit", duration_lower)
+            #error1 = t_start - filtered_time_g2[above_threshold[0]-1]
+            #error2 = filtered_time_g2[above_threshold[-1]+1]-t_end
+            #error_tot = error1+error2
+            #print("Outburst duration:", outburst_duration, "+-",error_tot, "days")
         
         start = np.where(filtered_time_g2 == t_start)[0]
         end = np.where(filtered_time_g2 == t_end)[0]
@@ -280,6 +288,34 @@ def burst_focus(time_mask_V2,flux_mask_V2, flux_error_mask_V2, time_mask_g2,flux
             # draw a noisy realization of the luminosities
             L_noisy = (lum_burst_g-average_g) + np.random.normal(loc=0.0, scale=lum_err_burst_g)
             # integrate using trapezoid rule
+            integrated_values[i] = np.trapz(L_noisy, time_burst_g)   
+        # Mean integrated energy:
+        E_mean = np.mean(integrated_values)
+        # 1-sigma error (standard deviation of the distribution):
+        E_std  = np.std(integrated_values)
+        
+            
+        print(f"Monte Carlo mean energy Upper Limit = {E_mean:.2e} erg ± {E_std:.2e} erg (1σ)")
+        
+        start_lower = np.where(filtered_time_g2 == t_start_lower)[0]
+        end_lower = np.where(filtered_time_g2 == t_end_lower)[0]
+        start_lower = start_lower[0]
+        end_lower = end_lower[0]
+        t_burst_g = filtered_time_g2[start_lower:end_lower]
+        lum_burst_g = lum_erg_g[start_lower:end_lower]
+        lum_err_burst_g = lum_err_g[start_lower:end_lower]
+        spd = 86400.0
+        time_burst_g = t_burst_g * spd
+    
+        N_sims = 10000
+        integrated_values = np.zeros(N_sims)
+        lum_err_burst_g = lum_err_burst_g.astype(float)
+        
+        
+        for i in range(N_sims):
+            # draw a noisy realization of the luminosities
+            L_noisy = (lum_burst_g-average_g) + np.random.normal(loc=0.0, scale=lum_err_burst_g)
+            # integrate using trapezoid rule
             integrated_values[i] = np.trapz(L_noisy, time_burst_g)
             
         # Mean integrated energy:
@@ -287,7 +323,7 @@ def burst_focus(time_mask_V2,flux_mask_V2, flux_error_mask_V2, time_mask_g2,flux
         # 1-sigma error (standard deviation of the distribution):
         E_std  = np.std(integrated_values)
             
-        print(f"Monte Carlo mean energy = {E_mean:.2e} erg ± {E_std:.2e} erg (1σ)")
+        print(f"Monte Carlo mean energy Lower Limit = {E_mean:.2e} erg ± {E_std:.2e} erg (1σ)")
         
     
     #start = np.where(filtered_time_V2 == t_start)[0]
@@ -323,7 +359,7 @@ def burst_focus(time_mask_V2,flux_mask_V2, flux_error_mask_V2, time_mask_g2,flux
     if band == "V":
         x_average_V = np.linspace(min(filtered_time_V2),max(filtered_time_V2),500)
         y_average_V = np.linspace(average_V,average_V,500)
-        threshold = average_V*1.5
+        threshold = average_V*1.3
         print("Threshold is", threshold)
         threshold_line = np.linspace(threshold,threshold,len(filtered_time_V2))
 
@@ -332,10 +368,16 @@ def burst_focus(time_mask_V2,flux_mask_V2, flux_error_mask_V2, time_mask_g2,flux
         if len(above_threshold) == 0:
             print("No points above threshold — no outburst detected.")
         else:
-            t_start = filtered_time_V2[above_threshold[0]]
-            t_end = filtered_time_V2[above_threshold[-1]]
+            t_start = filtered_time_V2[above_threshold[0]-1]
+            t_end = filtered_time_V2[above_threshold[-1]+1]
             outburst_duration = t_end - t_start
-            error1 = t_start - filtered_time_V2[above_threshold[0]-1]
+            print("Duration Upper Limit", outburst_duration)
+            
+            t_start_lower = filtered_time_V2[above_threshold[0]]
+            t_end_lower = filtered_time_V2[above_threshold[-1]]
+            duration_lower = t_end_lower - t_start_lower
+            print("Duration Lower Limit", duration_lower)
+            #error1 = t_start - filtered_time_V2[above_threshold[0]-1]
             #error2 = filtered_time_V2[above_threshold[-1]+1]-t_end
             #error_tot = error1+error2
             #print("Outburst duration:", outburst_duration, "+-",error_tot, "days")
@@ -362,6 +404,34 @@ def burst_focus(time_mask_V2,flux_mask_V2, flux_error_mask_V2, time_mask_g2,flux
         E_std  = np.std(integrated_values)
             
         print(f"Monte Carlo mean energy = {E_mean:.2e} erg ± {E_std:.2e} erg (1σ)")
+        
+        start_lower = np.where(filtered_time_V2 == t_start_lower)[0]
+        end_lower = np.where(filtered_time_V2 == t_end_lower)[0]
+        start_lower = start_lower[0]
+        end_lower = end_lower[0]
+        t_burst_V = filtered_time_V2[start_lower:end_lower]
+        lum_burst_V = lum_erg_V[start_lower:end_lower]
+        lum_err_burst_V = lum_err_V[start_lower:end_lower]
+        spd = 86400.0
+        time_burst_V = t_burst_V * spd
+    
+        N_sims = 10000
+        integrated_values = np.zeros(N_sims)
+        lum_err_burst_V = lum_err_burst_V.astype(float)
+        
+        
+        for i in range(N_sims):
+            # draw a noisy realization of the luminosities
+            L_noisy = (lum_burst_V-average_V) + np.random.normal(loc=0.0, scale=lum_err_burst_V)
+            # integrate using trapezoid rule
+            integrated_values[i] = np.trapz(L_noisy, time_burst_V)
+            
+        # Mean integrated energy:
+        E_mean = np.mean(integrated_values)
+        # 1-sigma error (standard deviation of the distribution):
+        E_std  = np.std(integrated_values)
+            
+        print(f"Monte Carlo mean energy Lower Limit = {E_mean:.2e} erg ± {E_std:.2e} erg (1σ)")
         
         maximum_V = np.where(lum_erg_V == np.max(lum_erg_V))
         error_mJy = filtered_flux_err_V2[maximum_V]
@@ -411,8 +481,7 @@ def literature_data():
     duration_dwarf = df_dwarf['Duration (d)'].to_numpy()
     duration_error_dwarf = df_dwarf['Duration Error (d)'].to_numpy()
     
-    print(len(total_en_dwarf))
-    print(len(peak_dwarf))
+
     
     names_micro = df_micro["Name"].to_numpy()
     peak_micro = df_micro["Peak Luminosity (erg/s)"].to_numpy()
@@ -421,6 +490,8 @@ def literature_data():
     total_en_error_micro = df_micro['Total Energy Error (erg)'].to_numpy()
     duration_micro = df_micro['Duration (d)'].to_numpy()
     duration_error_micro = df_micro['Duration Error (d)'].to_numpy()
+
+    
     
     names_donor = df_donor["Name"].to_numpy()
     peak_donor = df_donor["Peak Luminosity (erg/s)"].to_numpy()
@@ -470,6 +541,9 @@ def new_data():
     df_donor = df[df["Type"] == "Donor flare"]
     df_gating = df[df["Type"] == "Magnetic Gating"]
     
+    df_dwarf_iron = df_dwarf[df_dwarf['Ironclad?'] == 'Y']
+    df_micro_iron = df_micro[df_micro['Ironclad?'] == 'Y']
+    
     # Then extract arrays from each subset. For example:
     names_dwarf = df_dwarf["Name"].to_numpy()
     peak_dwarf = df_dwarf["Peak Luminosity (erg/s)"].to_numpy()
@@ -510,21 +584,42 @@ def new_data():
     P_orb_gating = df_gating['P_orb (h)'].to_numpy()
     P_spin_gating = df_gating['P_spin (s)'].to_numpy()
     
+    names_dwarf_iron = df_dwarf_iron["Name"].to_numpy()
+    peak_dwarf_iron = df_dwarf_iron["Peak Luminosity (erg/s)"].to_numpy()
+    peak_error_dwarf_iron = df_dwarf_iron['Peak Luminosity Error (erg/s)'].to_numpy()
+    total_en_dwarf_iron = df_dwarf_iron['Total Energy (erg)'].to_numpy()
+    total_en_error_dwarf_iron = df_dwarf_iron['Total Energy Error (erg)'].to_numpy()
+    duration_dwarf_iron = df_dwarf_iron['Duration (d)'].to_numpy()
+    duration_error_dwarf_iron = df_dwarf_iron['Duration Error (d)'].to_numpy()
+    P_orb_dwarf_iron = df_dwarf_iron['P_orb (h)'].to_numpy()
+    P_spin_dwarf_iron = df_dwarf_iron['P_spin (s)'].to_numpy()
+    
+    names_micro_iron = df_micro_iron["Name"].to_numpy()
+    peak_micro_iron = df_micro_iron["Peak Luminosity (erg/s)"].to_numpy()
+    peak_error_micro_iron = df_micro_iron['Peak Luminosity Error (erg/s)'].to_numpy()
+    total_en_micro_iron = df_micro_iron['Total Energy (erg)'].to_numpy()
+    total_en_error_micro_iron = df_micro_iron['Total Energy Error (erg)'].to_numpy()
+    duration_micro_iron = df_micro_iron['Duration (d)'].to_numpy()
+    duration_error_micro_iron = df_micro_iron['Duration Error (d)'].to_numpy()
+    P_orb_micro_iron = df_micro_iron['P_orb (h)'].to_numpy()
+    P_spin_micro_iron = df_micro_iron['P_spin (s)'].to_numpy()
+    
+    
     
     return (names_micro, peak_micro, peak_error_micro, total_en_micro, total_en_error_micro, duration_micro, duration_error_micro, P_orb_micro, P_spin_micro,
         names_donor, peak_donor, peak_error_donor, total_en_donor, total_en_error_donor, duration_donor, duration_error_donor,
-        names_gating, peak_gating, peak_error_gating, total_en_gating, total_en_error_gating, duration_gating, duration_error_gating, P_orb_gating, P_spin_gating,names_dwarf,peak_dwarf,peak_error_dwarf, total_en_dwarf,total_en_error_dwarf,duration_dwarf,duration_error_dwarf, P_orb_dwarf, P_spin_dwarf)
+        names_gating, peak_gating, peak_error_gating, total_en_gating, total_en_error_gating, duration_gating, duration_error_gating, P_orb_gating, P_spin_gating,names_dwarf,peak_dwarf,peak_error_dwarf, total_en_dwarf,total_en_error_dwarf,duration_dwarf,duration_error_dwarf, P_orb_dwarf, P_spin_dwarf,
+        names_micro_iron, peak_micro_iron, peak_error_micro_iron, total_en_micro_iron, total_en_error_micro_iron, duration_micro_iron, duration_error_micro_iron, P_orb_micro_iron, P_spin_micro_iron,names_dwarf_iron,peak_dwarf_iron,peak_error_dwarf_iron, total_en_dwarf_iron,total_en_error_dwarf_iron,duration_dwarf_iron,duration_error_dwarf_iron, P_orb_dwarf_iron, P_spin_dwarf_iron)
     
 def comparison_plot():
-    names_micro1, peak_micro1, peak_error_micro1, total_en_micro1, total_en_error_micro1, duration_micro1, duration_error_micro1, names_donor1, peak_donor1, peak_error_donor1, total_en_donor1, total_en_error_donor1, duration_donor1, duration_error_donor1,names_gating1, peak_gating1, peak_error_gating1, total_en_gating1, total_en_error_gating1, duration_gating1, duration_error_gating1, names_dwarf1,peak_dwarf1,peak_error_dwarf1, total_en_dwarf1,total_en_error_dwarf1,duration_dwarf1,duration_error_dwarf1 = literature_data()
-    names_micro, peak_micro, peak_error_micro, total_en_micro, total_en_error_micro, duration_micro, duration_error_micro,P_orb_micro, P_spin_micro,names_donor, peak_donor, peak_error_donor, total_en_donor, total_en_error_donor, duration_donor, duration_error_donor,names_gating, peak_gating, peak_error_gating, total_en_gating, total_en_error_gating, duration_gating, duration_error_gating, P_orb_gating,P_spin_gating,names_dwarf,peak_dwarf,peak_error_dwarf, total_en_dwarf,total_en_error_dwarf,duration_dwarf,duration_error_dwarf,P_orb_dwarf,P_spin_dwarf = new_data()
-    plt.errorbar(total_en_micro, peak_micro, xerr=total_en_error_micro, yerr=peak_error_micro, label="Micronovae (new)", color="blue", markersize=6, fmt='^',elinewidth=0.5)
-    plt.errorbar(total_en_dwarf, peak_dwarf, xerr=total_en_error_dwarf, yerr=peak_error_dwarf, label="Dwarf Novae (new)", color="red", markersize=6, fmt='^',elinewidth=0.5)
-    
-    
-    plt.errorbar(total_en_micro1,peak_micro1,xerr = total_en_error_micro1, yerr= peak_error_micro1,label = "Micronovae",color = "blue",markersize=6, fmt = 'o',elinewidth=0.5)
-    plt.errorbar(total_en_dwarf1, peak_dwarf1,xerr=total_en_error_dwarf1, yerr=peak_error_dwarf1,label="Dwarf Novae", color="red", markersize=6, fmt='o',elinewidth=0.5)
-    plt.errorbar(total_en_gating1, peak_gating1,xerr=total_en_error_gating1, yerr=peak_error_gating1,label="Magnetic Gating", color="yellow", markersize=6, fmt='o',elinewidth=0.5)
+    names_micro1, peak_micro1, peak_error_micro1, total_en_micro1, total_en_error_micro1, duration_micro1, duration_error_micro1,names_donor1, peak_donor1, peak_error_donor1, total_en_donor1, total_en_error_donor1, duration_donor1, duration_error_donor1,names_gating1, peak_gating1, peak_error_gating1, total_en_gating1, total_en_error_gating1, duration_gating1, duration_error_gating1, names_dwarf1,peak_dwarf1,peak_error_dwarf1, total_en_dwarf1,total_en_error_dwarf1,duration_dwarf1,duration_error_dwarf1 = literature_data()
+    names_micro, peak_micro, peak_error_micro, total_en_micro, total_en_error_micro, duration_micro, duration_error_micro,P_orb_micro, P_spin_micro,names_donor, peak_donor, peak_error_donor, total_en_donor, total_en_error_donor, duration_donor, duration_error_donor,names_gating, peak_gating, peak_error_gating, total_en_gating, total_en_error_gating, duration_gating, duration_error_gating, P_orb_gating,P_spin_gating,names_dwarf,peak_dwarf,peak_error_dwarf, total_en_dwarf,total_en_error_dwarf,duration_dwarf,duration_error_dwarf,P_orb_dwarf,P_spin_dwarf,names_micro_iron, peak_micro_iron, peak_error_micro_iron, total_en_micro_iron, total_en_error_micro_iron, duration_micro_iron, duration_error_micro_iron, P_orb_micro_iron, P_spin_micro_iron,names_dwarf_iron,peak_dwarf_iron,peak_error_dwarf_iron, total_en_dwarf_iron,total_en_error_dwarf_iron,duration_dwarf_iron,duration_error_dwarf_iron, P_orb_dwarf_iron, P_spin_dwarf_iron = new_data()
+    plt.errorbar(total_en_micro, peak_micro, xerr=total_en_error_micro, yerr=peak_error_micro, label="Micronovae (new)", color="blue", markersize=6, fmt='o',elinewidth=0.5)
+    plt.errorbar(total_en_dwarf, peak_dwarf, xerr=total_en_error_dwarf, yerr=peak_error_dwarf, label="Dwarf Novae (new)", color="red", markersize=6, fmt='o',elinewidth=0.5)
+     
+    plt.errorbar(total_en_micro1,peak_micro1,xerr = total_en_error_micro1, yerr= peak_error_micro1,label = "Micronovae",color = "blue",markersize=6, fmt = 'o',elinewidth=0.5, fillstyle = 'none')
+    plt.errorbar(total_en_dwarf1, peak_dwarf1,xerr=total_en_error_dwarf1, yerr=peak_error_dwarf1,label="Dwarf Novae", color="red", markersize=6, fmt='o',elinewidth=0.5, fillstyle = 'none')
+    plt.errorbar(total_en_gating1, peak_gating1,xerr=total_en_error_gating1, yerr=peak_error_gating1,label="Magnetic Gating", color="yellow", markersize=6, fmt='o',elinewidth=0.5, fillstyle = 'none')
 
     plt.xlabel("Total Optical Energy (erg)")
     plt.ylabel("Peak Optical Luminosity (erg/s)")
@@ -533,11 +628,11 @@ def comparison_plot():
     plt.legend()
     plt.show()
     
-    plt.errorbar(total_en_micro, duration_micro, xerr=total_en_error_micro, yerr=duration_error_micro, label="Micronovae (new)", color="blue", fmt='^', markersize=6, elinewidth=0.5, capsize=2, capthick=0.5)
-    plt.errorbar(total_en_dwarf, duration_dwarf, xerr=total_en_error_dwarf, yerr=duration_error_dwarf, label="Dwarf Novae (new)", color="red", fmt='^', markersize=6, elinewidth=0.5, capsize=2, capthick=0.5)
-    plt.errorbar(total_en_micro1, duration_micro1, xerr=total_en_error_micro1, yerr=duration_error_micro1, label="Micronovae", color="blue", fmt='o', markersize=6, elinewidth=0.5, capsize=2, capthick=0.5)
-    plt.errorbar(total_en_dwarf1, duration_dwarf1, xerr=total_en_error_dwarf1, yerr=duration_error_dwarf1, label="Dwarf Novae", color="red", fmt='o', markersize=6, elinewidth=0.5, capsize=2, capthick=0.5)
-    plt.errorbar(total_en_gating1, duration_gating1, xerr=total_en_error_gating1, yerr=duration_error_gating1, label="Magnetic Gating", color="yellow", fmt='o', markersize=6, elinewidth=0.5, capsize=2, capthick=0.5)
+    plt.errorbar(total_en_micro, duration_micro, xerr=total_en_error_micro, yerr=duration_error_micro, label="Micronovae (new)", color="blue", fmt='o', markersize=6, elinewidth=0.5, capsize=2, capthick=0.5)
+    plt.errorbar(total_en_dwarf, duration_dwarf, xerr=total_en_error_dwarf, yerr=duration_error_dwarf, label="Dwarf Novae (new)", color="red", fmt='o', markersize=6, elinewidth=0.5, capsize=2, capthick=0.5)
+    plt.errorbar(total_en_micro1, duration_micro1, xerr=total_en_error_micro1, yerr=duration_error_micro1, label="Micronovae", color="blue", fmt='o', markersize=6, elinewidth=0.5, capsize=2, capthick=0.5, fillstyle = 'none')
+    plt.errorbar(total_en_dwarf1, duration_dwarf1, xerr=total_en_error_dwarf1, yerr=duration_error_dwarf1, label="Dwarf Novae", color="red", fmt='o', markersize=6, elinewidth=0.5, capsize=2, capthick=0.5, fillstyle = 'none')
+    plt.errorbar(total_en_gating1, duration_gating1, xerr=total_en_error_gating1, yerr=duration_error_gating1, label="Magnetic Gating", color="yellow", fmt='o', markersize=6, elinewidth=0.5, capsize=2, capthick=0.5, fillstyle = 'none')
     plt.xlabel("Total Optical Energy (erg)")
     plt.ylabel("Burst Duration (d)")
     plt.xscale('log')
@@ -545,11 +640,18 @@ def comparison_plot():
     plt.legend()
     plt.show()
     
-    print(P_orb_dwarf)
     
-    plt.scatter(P_orb_dwarf,P_spin_dwarf,s=5, color = 'blue', label = "Dwarf Nova")
-    plt.scatter(P_orb_micro,P_spin_micro,s=5, color = 'red', label = "Micronova")
-    plt.scatter(P_orb_gating,P_spin_gating,s=5, color = 'yellow', label = "Magnetic Gating")
+    plt.scatter(P_orb_dwarf,P_spin_dwarf,s=6, color = 'blue', label = "Dwarf Nova")
+    plt.scatter(P_orb_micro,P_spin_micro,s=6, color = 'red', label = "Micronova")
+    plt.scatter(P_orb_gating,P_spin_gating,s=6, color = 'yellow', label = "Magnetic Gating")
+    
+    
+    P_orb_micro1 = np.array([5.49,6.43])
+    P_spin_micro1 = np.array([1909.7,741.6])
+    P_orb_gating1 = np.array([1.62,1.41])
+    P_spin_gating1 = np.array([2280,2146])
+    plt.scatter(P_orb_micro1,P_spin_micro1, s=6, color = 'red', label = "Micronova (old)", marker = '^')
+    plt.scatter(P_orb_gating1,P_spin_gating1, s=6, color = 'yellow', label = "Magnetic Gating (old)", marker = '^')
     
     xvals = np.linspace(1,20, 100)
 
@@ -591,14 +693,68 @@ def comparison_plot():
     
     plt.xscale('log')
     plt.yscale('log')
-    plt.legend(loc = 'upper left')
+    plt.legend(loc="upper left", bbox_to_anchor=(1, 1))
     plt.xlabel("Orbital Period (hrs)")
     plt.ylabel("Spin Period (s)")
     plt.show()
     
+    plt.errorbar(P_orb_dwarf, peak_dwarf, yerr = peak_error_dwarf, fmt = 'o',  markersize=5, elinewidth=0.5, capsize=2, capthick=0.5, color = 'blue', label = 'Dwarf Nova')
+    plt.errorbar(P_orb_micro, peak_micro, yerr = peak_error_micro, fmt = 'o',  markersize=5, elinewidth=0.5, capsize=2, capthick=0.5, color = 'red', label = "Micronova")
+    plt.xlabel("Orbital Period (d)")
+    plt.ylabel("Peak Optical Luminosity (erg/s)")
+    plt.legend()
+    plt.yscale('log')
+    
+    plt.show()
+    
+    
+    
+    ratio_dwarf = P_spin_dwarf/(P_orb_dwarf*3600)
+    ratio_micro = P_spin_micro/(P_orb_micro*3600)
+    plt.scatter(ratio_dwarf, peak_dwarf, color = 'blue', s=5)
+    plt.scatter(ratio_micro, peak_micro, color = 'red', s=5)
+    plt.yscale('log')
+    plt.legend()
+    plt.xlabel("$P_{spin}/P_{orb}$")
+    plt.ylabel("Peak Optical Luminosity (erg/s)")
+    
+    plt.show()
+    
+    plt.errorbar(total_en_micro_iron, peak_micro_iron, xerr=total_en_error_micro_iron, yerr=peak_error_micro_iron, label="Micronovae (new)", color="grey", markersize=6, fmt='o',elinewidth=0.5)
+    plt.errorbar(total_en_dwarf_iron, peak_dwarf_iron, xerr=total_en_error_dwarf_iron, yerr=peak_error_dwarf_iron, label="Dwarf Novae (new)", color="grey", markersize=6, fmt='o',elinewidth=0.5)
+     
+    plt.errorbar(total_en_micro1,peak_micro1,xerr = total_en_error_micro1, yerr= peak_error_micro1,label = "Micronovae",color = "blue",markersize=6, fmt = 'o',elinewidth=0.5,fillstyle="none")
+    plt.errorbar(total_en_dwarf1, peak_dwarf1,xerr=total_en_error_dwarf1, yerr=peak_error_dwarf1,label="Dwarf Novae", color="red", markersize=6, fmt='o',elinewidth=0.5,fillstyle='none')
+    plt.errorbar(total_en_gating1, peak_gating1,xerr=total_en_error_gating1, yerr=peak_error_gating1,label="Magnetic Gating", color="yellow", markersize=6, fmt='o',elinewidth=0.5,fillstyle='none')
+
+    plt.xlabel("Total Optical Energy (erg)")
+    plt.ylabel("Peak Optical Luminosity (erg/s)")
+    plt.xscale('log')
+    plt.yscale('log')
+    plt.legend()
+    plt.title("Ironclad IPs Only")
+    plt.show()
+    
+    plt.errorbar(total_en_micro_iron, duration_micro_iron, xerr=total_en_error_micro_iron, yerr=duration_error_micro_iron, label="Micronovae (new)", color="grey", fmt='o', markersize=6, elinewidth=0.5, capsize=2, capthick=0.5)
+    plt.errorbar(total_en_dwarf_iron, duration_dwarf_iron, xerr=total_en_error_dwarf_iron, yerr=duration_error_dwarf_iron, label="Dwarf Novae (new)", color="grey", fmt='o', markersize=6, elinewidth=0.5, capsize=2, capthick=0.5)
+    plt.errorbar(total_en_micro1, duration_micro1, xerr=total_en_error_micro1, yerr=duration_error_micro1, label="Micronovae", color="blue", fmt='o', markersize=6, elinewidth=0.5, capsize=2, capthick=0.5,fillstyle = 'none')
+    plt.errorbar(total_en_dwarf1, duration_dwarf1, xerr=total_en_error_dwarf1, yerr=duration_error_dwarf1, label="Dwarf Novae", color="red", fmt='o', markersize=6, elinewidth=0.5, capsize=2, capthick=0.5, fillstyle = 'none')
+    plt.errorbar(total_en_gating1, duration_gating1, xerr=total_en_error_gating1, yerr=duration_error_gating1, label="Magnetic Gating", color="yellow", fmt='o', markersize=6, elinewidth=0.5, capsize=2, capthick=0.5, fillstyle = 'none')
+    plt.xlabel("Total Optical Energy (erg)")
+    plt.ylabel("Burst Duration (d)")
+    plt.xscale('log')
+    plt.yscale('log')
+    plt.legend()
+    plt.title("Ironclad IPs only")
+    plt.show()
+
+    
+    
+    
+    
 #read_files()
 time_mask_V2,flux_mask_V2, flux_error_mask_V2, time_mask_g2,flux_mask_g2,flux_error_mask_g2 = specific_file()
-#burst_focus(time_mask_V2,flux_mask_V2, flux_error_mask_V2, time_mask_g2,flux_mask_g2,flux_error_mask_g2,2.728*10**(44), 'g')
+burst_focus(time_mask_V2,flux_mask_V2, flux_error_mask_V2, time_mask_g2,flux_mask_g2,flux_error_mask_g2,3.11*10**(42), 'g')
 #literature_data()
 #new_data()
-comparison_plot()
+#comparison_plot()
