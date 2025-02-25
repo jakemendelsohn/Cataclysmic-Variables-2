@@ -31,6 +31,164 @@ from ztfquery import lightcurve
 import glob
 import random
 
+def literature_data():
+    df = pd.read_csv('C:/Users/jakem/OneDrive/Documents/Year 4 Project/Classified Optical Outbursts Data.csv')
+
+    # Each column can be converted into a NumPy array like so:
+    names = df['Name'].to_numpy()
+    types = df['Type'].to_numpy()
+    peak_luminosity = df['Peak Luminosity (erg/s)'].to_numpy()
+    peak_luminosity_err = df['Peak Luminosity Error (erg/s)'].to_numpy()
+    total_energy = df['Total Energy (erg)'].to_numpy()
+    total_energy_err = df['Total Energy Error (erg)'].to_numpy()
+    duration = df['Duration (d)'].to_numpy()
+    duration_err = df['Duration Error (d)'].to_numpy()
+    print('Names:', names)
+    print('Peak luminosities:', peak_luminosity)
+    
+    df_dwarf = df[df["Type"] == "Dwarf nova"]
+    df_micro = df[df["Type"] == "Micronova"]
+    df_donor = df[df["Type"] == "Donor flare"]
+    df_gating = df[df["Type"] == "Magnetic Gating"]
+    
+    # Then extract arrays from each subset. For example:
+    names_dwarf = df_dwarf["Name"].to_numpy()
+    peak_dwarf = df_dwarf["Peak Luminosity (erg/s)"].to_numpy()
+    peak_error_dwarf = df_dwarf['Peak Luminosity Error (erg/s)'].to_numpy()
+    total_en_dwarf = df_dwarf['Total Energy (erg)'].to_numpy()
+    total_en_error_dwarf = df_dwarf['Total Energy Error (erg)'].to_numpy()
+    duration_dwarf = df_dwarf['Duration (d)'].to_numpy()
+    duration_error_dwarf = df_dwarf['Duration Error (d)'].to_numpy()
+    
+
+    
+    names_micro = df_micro["Name"].to_numpy()
+    peak_micro = df_micro["Peak Luminosity (erg/s)"].to_numpy()
+    peak_error_micro = df_micro['Peak Luminosity Error (erg/s)'].to_numpy()
+    total_en_micro = df_micro['Total Energy (erg)'].to_numpy()
+    total_en_error_micro = df_micro['Total Energy Error (erg)'].to_numpy()
+    duration_micro = df_micro['Duration (d)'].to_numpy()
+    duration_error_micro = df_micro['Duration Error (d)'].to_numpy()
+
+    
+    
+    names_donor = df_donor["Name"].to_numpy()
+    peak_donor = df_donor["Peak Luminosity (erg/s)"].to_numpy()
+    peak_error_donor = df_donor['Peak Luminosity Error (erg/s)'].to_numpy()
+    total_en_donor= df_donor['Total Energy (erg)'].to_numpy()
+    total_en_error_donor = df_donor['Total Energy Error (erg)'].to_numpy()
+    duration_donor = df_donor['Duration (d)'].to_numpy()
+    duration_error_donor = df_donor['Duration Error (d)'].to_numpy()
+    
+    names_gating = df_gating["Name"].to_numpy()
+    peak_gating = df_gating["Peak Luminosity (erg/s)"].to_numpy()
+    peak_error_gating = df_gating['Peak Luminosity Error (erg/s)'].to_numpy()
+    total_en_gating = df_gating['Total Energy (erg)'].to_numpy()
+    total_en_error_gating = df_gating['Total Energy Error (erg)'].to_numpy()
+    duration_gating = df_gating['Duration (d)'].to_numpy()
+    duration_error_gating = df_gating['Duration Error (d)'].to_numpy()
+    
+    plt.scatter(total_en_micro,peak_micro,label = "Micronovae",color = "blue",s=5)
+    plt.scatter(total_en_dwarf,peak_dwarf,label = "Dwarf Novae", color = "red",s=5)
+    plt.scatter(total_en_gating,peak_gating, label = "Magnetic Gating", color = "yellow", s=5)
+    plt.xscale('log')
+    plt.yscale('log')
+    plt.legend()
+    plt.show()
+    
+    return (names_micro, peak_micro, peak_error_micro, total_en_micro, total_en_error_micro, duration_micro, duration_error_micro,
+        names_donor, peak_donor, peak_error_donor, total_en_donor, total_en_error_donor, duration_donor, duration_error_donor,
+        names_gating, peak_gating, peak_error_gating, total_en_gating, total_en_error_gating, duration_gating, duration_error_gating, names_dwarf,peak_dwarf,peak_error_dwarf, total_en_dwarf,total_en_error_dwarf,duration_dwarf,duration_error_dwarf)
+
+def new_data():
+    df = pd.read_csv('C:/Users/jakem/OneDrive/Documents/Year 4 Project/Outbursts Compiled List (updated durations).xlsx.csv')
+
+    # Each column can be converted into a NumPy array like so:
+    names = df['Name'].to_numpy()
+    types = df['Type'].to_numpy()
+    peak_luminosity = df['Peak Luminosity (erg/s)'].to_numpy()
+    peak_luminosity_err = df['Peak Luminosity Error (erg/s)'].to_numpy()
+    total_energy_lower = df['Total Energy Lower (erg)'].to_numpy()
+    total_energy_upper = df['Total Energy Upper (erg)'].to_numpy()
+    duration_lower = df['Duration Lower (d)'].to_numpy()
+    duration_upper = df['Duration Upper (d)'].to_numpy()
+
+    
+    df_dwarf = df[df["Type"] == "Dwarf nova"]
+    df_micro = df[df["Type"] == "Micronova"]
+    df_donor = df[df["Type"] == "Donor flare"]
+    df_gating = df[df["Type"] == "Magnetic Gating"]
+    
+    df_dwarf_iron = df_dwarf[df_dwarf['Ironclad?'] == 'Y']
+    df_micro_iron = df_micro[df_micro['Ironclad?'] == 'Y']
+    
+    # Then extract arrays from each subset. For example:
+    names_dwarf = df_dwarf["Name"].to_numpy()
+    peak_dwarf = df_dwarf["Peak Luminosity (erg/s)"].to_numpy()
+    peak_error_dwarf = df_dwarf['Peak Luminosity Error (erg/s)'].to_numpy()
+    total_en_dwarf_low = df_dwarf['Total Energy Lower (erg)'].to_numpy()
+    total_en_dwarf_up = df_dwarf['Total Energy Upper (erg)'].to_numpy()
+    duration_dwarf_low = df_dwarf['Duration Lower (d)'].to_numpy()
+    duration_dwarf_up = df_dwarf['Duration Upper (d)'].to_numpy()
+    P_orb_dwarf = df_dwarf['P_orb (h)'].to_numpy()
+    P_spin_dwarf = df_dwarf['P_spin (s)'].to_numpy()
+
+    
+    names_micro = df_micro["Name"].to_numpy()
+    peak_micro = df_micro["Peak Luminosity (erg/s)"].to_numpy()
+    peak_error_micro = df_micro['Peak Luminosity Error (erg/s)'].to_numpy()
+    total_en_micro_up = df_micro['Total Energy Upper (erg)'].to_numpy()
+    total_en_micro_low = df_micro['Total Energy Lower (erg)'].to_numpy()
+    duration_micro_up = df_micro['Duration Upper (d)'].to_numpy()
+    duration_micro_low = df_micro['Duration Lower (d)'].to_numpy()
+    P_orb_micro = df_micro['P_orb (h)'].to_numpy()
+    P_spin_micro = df_micro['P_spin (s)'].to_numpy()
+    
+    names_donor = df_donor["Name"].to_numpy()
+    peak_donor = df_donor["Peak Luminosity (erg/s)"].to_numpy()
+    peak_error_donor = df_donor['Peak Luminosity Error (erg/s)'].to_numpy()
+    total_en_donor= df_donor['Total Energy Upper (erg)'].to_numpy()
+    total_en_error_donor = df_donor['Total Energy Lower (erg)'].to_numpy()
+    duration_donor = df_donor['Duration Upper (d)'].to_numpy()
+    duration_error_donor = df_donor['Duration Lower (d)'].to_numpy()
+    
+    names_gating = df_gating["Name"].to_numpy()
+    peak_gating = df_gating["Peak Luminosity (erg/s)"].to_numpy()
+    peak_error_gating = df_gating['Peak Luminosity Error (erg/s)'].to_numpy()
+    total_en_gating = df_gating['Total Energy Upper (erg)'].to_numpy()
+    total_en_error_gating = df_gating['Total Energy Lower (erg)'].to_numpy()
+    duration_gating = df_gating['Duration Upper (d)'].to_numpy()
+    duration_error_gating = df_gating['Duration Lower (d)'].to_numpy()
+    P_orb_gating = df_gating['P_orb (h)'].to_numpy()
+    P_spin_gating = df_gating['P_spin (s)'].to_numpy()
+    
+    names_dwarf_iron = df_dwarf_iron["Name"].to_numpy()
+    peak_dwarf_iron = df_dwarf_iron["Peak Luminosity (erg/s)"].to_numpy()
+    peak_error_dwarf_iron = df_dwarf_iron['Peak Luminosity Error (erg/s)'].to_numpy()
+    total_en_dwarf_iron_up = df_dwarf_iron['Total Energy Upper (erg)'].to_numpy()
+    total_en_dwarf_iron_low = df_dwarf_iron['Total Energy Lower (erg)'].to_numpy()
+    duration_dwarf_iron_up = df_dwarf_iron['Duration Upper (d)'].to_numpy()
+    duration_dwarf_iron_low = df_dwarf_iron['Duration Lower (d)'].to_numpy()
+    P_orb_dwarf_iron = df_dwarf_iron['P_orb (h)'].to_numpy()
+    P_spin_dwarf_iron = df_dwarf_iron['P_spin (s)'].to_numpy()
+    
+    names_micro_iron = df_micro_iron["Name"].to_numpy()
+    peak_micro_iron = df_micro_iron["Peak Luminosity (erg/s)"].to_numpy()
+    peak_error_micro_iron = df_micro_iron['Peak Luminosity Error (erg/s)'].to_numpy()
+    total_en_micro_iron_up = df_micro_iron['Total Energy Upper (erg)'].to_numpy()
+    total_en_micro_iron_low = df_micro_iron['Total Energy Lower (erg)'].to_numpy()
+    duration_micro_iron_up = df_micro_iron['Duration Upper (d)'].to_numpy()
+    duration_micro_iron_low = df_micro_iron['Duration Lower (d)'].to_numpy()
+    P_orb_micro_iron = df_micro_iron['P_orb (h)'].to_numpy()
+    P_spin_micro_iron = df_micro_iron['P_spin (s)'].to_numpy()
+    
+    
+    
+    return (names_micro, peak_micro, peak_error_micro, total_en_micro_up, total_en_micro_low, duration_micro_up, duration_micro_low, P_orb_micro, P_spin_micro,
+        names_donor, peak_donor, peak_error_donor, total_en_donor, total_en_error_donor, duration_donor, duration_error_donor,
+        names_gating, peak_gating, peak_error_gating, total_en_gating, total_en_error_gating, duration_gating, duration_error_gating, P_orb_gating, P_spin_gating,names_dwarf,peak_dwarf,peak_error_dwarf, total_en_dwarf_up,total_en_dwarf_low,duration_dwarf_up,duration_dwarf_low, P_orb_dwarf, P_spin_dwarf,
+        names_micro_iron, peak_micro_iron, peak_error_micro_iron, total_en_micro_iron_up, total_en_micro_iron_low, duration_micro_iron_up, duration_micro_iron_low, P_orb_micro_iron, P_spin_micro_iron,names_dwarf_iron,peak_dwarf_iron,peak_error_dwarf_iron, total_en_dwarf_iron_up,total_en_dwarf_iron_low,duration_dwarf_iron_up,duration_dwarf_iron_low, P_orb_dwarf_iron, P_spin_dwarf_iron)
+
 def ASAS_SN_19bh(index):
     search_result = lk.search_lightcurve('ASASSN -19bh', mission='TESS')
     lc = search_result[index].download()
@@ -64,7 +222,7 @@ def ASAS_SN_delt():
     cdf = np.arange(1, n+1) / float(n)
     
     # Plot the empirical CDF
-   # plt.scatter(delta_sorted, cdf,s=1)
+    #plt.scatter(delta_sorted, cdf,s=1)
     #plt.xlabel('Delta time')
     #plt.ylabel('CDF')
     #plt.show()
@@ -77,7 +235,7 @@ def LC_model():
     time = time[time_mask]
     flux = flux[time_mask]
     
-    factor = (2*10**(34))/np.max(flux)
+    factor = (3.5*10**(34))/np.max(flux)
     flux = flux*factor
     
     plt.scatter(time,flux,s=1,color = "black")
@@ -103,7 +261,7 @@ def LC_model():
     plt.show()
     peak_lumi = np.max(flux_array)
     
-    threshold = 0.4*10**(34)
+    threshold = 0.77*10**(34)
     above_threshold = np.where(flux_array > threshold)[0]
     if len(above_threshold) == 0:
         print("No points above threshold — no outburst detected.")
@@ -131,8 +289,11 @@ def LC_model():
         lum_burst = flux_array[start:end]
         spd = 86400.0
         time_burst = t_burst * spd
-        
-        integral_up = np.trapz(lum_burst,time_burst)
+        extracted_set = set(lum_burst)
+        remainder = [x for x in flux_array if x not in extracted_set]
+        avg = np.mean(remainder)
+    
+        integral_up = np.trapz(lum_burst-avg,time_burst)
         print(f"Energy Upper Limit = {integral_up:.2e} erg")
         
         start_lower = np.where(time_array == t_start_lower)[0]
@@ -144,7 +305,7 @@ def LC_model():
         spd = 86400.0
         time_burst = t_burst * spd
         
-        integral_low = np.trapz(lum_burst,time_burst)
+        integral_low = np.trapz(lum_burst-avg,time_burst)
         print(f"Energy Lower Limit = {integral_low:.2e} erg")
         
     return peak_lumi, integral_low,integral_up,outburst_duration,duration_lower
@@ -171,12 +332,72 @@ def simulation(iterations):
     mean_int_overall = np.mean(avg_int_per_run)  # average across all iterations
     mean_dur_overall = np.mean(avg_dur_per_run)
     
-    plt.scatter(avg_int_per_run,lum_array)
-    plt.xlabel("Average Eenergy (ergs)")
-    plt.ylabel("Peak Luminosity (erg/s)")
+    #plt.scatter(avg_int_per_run,lum_array)
+    #plt.xlabel("Average Eenergy (ergs)")
+    #plt.ylabel("Peak Luminosity (erg/s)")
     
+    return avg_int_per_run,lum_array, int_low_array
+    
+def simulation_comparison(iterations):
+    names_micro1, peak_micro1, peak_error_micro1, total_en_micro1, total_en_error_micro1, duration_micro1, duration_error_micro1,names_donor1, peak_donor1, peak_error_donor1, total_en_donor1, total_en_error_donor1, duration_donor1, duration_error_donor1,names_gating1, peak_gating1, peak_error_gating1, total_en_gating1, total_en_error_gating1, duration_gating1, duration_error_gating1, names_dwarf1,peak_dwarf1,peak_error_dwarf1, total_en_dwarf1,total_en_error_dwarf1,duration_dwarf1,duration_error_dwarf1 = literature_data()
+    names_micro, peak_micro, peak_error_micro, total_en_micro_up, total_en_micro_low, duration_micro_up, duration_micro_low,P_orb_micro, P_spin_micro,names_donor, peak_donor, peak_error_donor, total_en_donor, total_en_error_donor, duration_donor, duration_error_donor,names_gating, peak_gating, peak_error_gating, total_en_gating, total_en_error_gating, duration_gating, duration_error_gating, P_orb_gating,P_spin_gating,names_dwarf,peak_dwarf,peak_error_dwarf, total_en_dwarf_up,total_en_dwarf_low,duration_dwarf_up,duration_dwarf_low,P_orb_dwarf,P_spin_dwarf,names_micro_iron, peak_micro_iron, peak_error_micro_iron, total_en_micro_iron_up, total_en_micro_iron_low, duration_micro_iron_up, duration_micro_iron_low, P_orb_micro_iron, P_spin_micro_iron,names_dwarf_iron,peak_dwarf_iron,peak_error_dwarf_iron, total_en_dwarf_iron_up,total_en_dwarf_iron_low,duration_dwarf_iron_up,duration_dwarf_iron_low, P_orb_dwarf_iron, P_spin_dwarf_iron = new_data()
+    
+    energy, lum_array, low_energies = simulation(iterations)
+    
+    midpoint_en_micro = (total_en_micro_up+total_en_micro_low)/2
+    xerr_lower_micro = midpoint_en_micro - total_en_micro_low
+    xerr_upper_micro = total_en_micro_up - midpoint_en_micro
+    
+    midpoint_en_dwarf = (total_en_dwarf_up+total_en_dwarf_low)/2
+    xerr_lower_dwarf = midpoint_en_dwarf - total_en_dwarf_low
+    xerr_upper_dwarf = total_en_dwarf_up - midpoint_en_dwarf
+    
+    
+    midpoint_en_micro_iron = (total_en_micro_iron_up+total_en_micro_iron_low)/2
+    xerr_lower_micro_iron = midpoint_en_micro_iron - total_en_micro_iron_low
+    xerr_upper_micro_iron = total_en_micro_iron_up - midpoint_en_micro_iron
+    
+    midpoint_en_dwarf_iron = (total_en_dwarf_iron_up+total_en_dwarf_iron_low)/2
+    xerr_lower_dwarf_iron = midpoint_en_dwarf_iron - total_en_dwarf_iron_low
+    xerr_upper_dwarf_iron = total_en_dwarf_iron_up - midpoint_en_dwarf_iron
+    
+    midpoint_dur_micro_iron = (duration_micro_iron_up+duration_micro_iron_low)/2
+    xerr_lower_micro_dur = midpoint_dur_micro_iron - duration_micro_iron_low
+    xerr_upper_micro_dur = duration_micro_iron_up - midpoint_dur_micro_iron
+    
+    midpoint_dur_dwarf_iron = (duration_dwarf_iron_up+duration_dwarf_iron_low)/2
+    xerr_lower_dwarf_dur = midpoint_dur_dwarf_iron - duration_dwarf_iron_low
+    xerr_upper_dwarf_dur = duration_dwarf_iron_up - midpoint_dur_dwarf_iron
+    
+    
+    
+    
+    plt.errorbar(midpoint_en_micro_iron, peak_micro_iron,xerr = [xerr_lower_micro_iron, xerr_upper_micro_iron],yerr = peak_error_micro_iron,fmt = 'o', markersize = 6, elinewidth = 0.5,color = 'grey', label = 'Ironclad IPs')
+    plt.errorbar(midpoint_en_dwarf_iron, peak_dwarf_iron,xerr = [xerr_lower_dwarf_iron, xerr_upper_dwarf_iron],yerr = peak_error_dwarf_iron,fmt = 'o', markersize = 6, elinewidth = 0.5,color = 'grey')
+    
+    plt.errorbar(total_en_micro1,peak_micro1,xerr = total_en_error_micro1, yerr= peak_error_micro1,label = "Micronovae",color = "blue",markersize=6, fmt = 'o',elinewidth=0.5, fillstyle = 'none')
+    plt.errorbar(total_en_dwarf1, peak_dwarf1,xerr=total_en_error_dwarf1, yerr=peak_error_dwarf1,label="Dwarf Novae", color="red", markersize=6, fmt='o',elinewidth=0.5, fillstyle = 'none')
+    plt.errorbar(total_en_gating1, peak_gating1,xerr=total_en_error_gating1, yerr=peak_error_gating1,label="Magnetic Gating", color="green", markersize=6, fmt='o',elinewidth=0.5, fillstyle = 'none')
 
+
+    central_x = 1.2*10**(39)
+    central_y = 3.5*10**(34)
+    plt.scatter(low_energies,lum_array, color = "orange", alpha = 0.3, label = "Simulations")
+    plt.scatter(central_x,central_y,color = "red",marker = "x", label = "ASAS-SN 19bh")
+    
+    plt.xlabel("Total Optical Energy (erg)")
+    plt.ylabel("Peak Optical Luminosity (erg/s)")
+    plt.xscale('log')
+    plt.yscale('log')
+    plt.legend()
+    plt.show()
+    
+    
+    plt.errorbar(midpoint_en_micro_iron, midpoint_dur_micro_iron,xerr = [xerr_lower_micro_iron, xerr_upper_micro_iron],yerr = [xerr_lower_micro_dur,xerr_upper_micro_dur],fmt = 'o', markersize = 6, elinewidth = 0.5,color = 'grey', label = 'Ironclad IPs')
+    plt.errorbar(midpoint_en_dwarf_iron, midpoint_dur_dwarf_iron,xerr = [xerr_lower_dwarf_iron, xerr_upper_dwarf_iron],yerr = [xerr_lower_dwarf_dur,xerr_upper_dwarf_dur],fmt = 'o', markersize = 6, elinewidth = 0.5,color = 'grey')
+    plt.xscale("log")
     
 #LC_model()
 #ASAS_SN_delt()
-simulation(100)
+#simulation(100)
+simulation_comparison(20)
