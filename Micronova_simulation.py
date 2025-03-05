@@ -30,6 +30,7 @@ from ztfquery import query
 from ztfquery import lightcurve
 import glob
 import random
+from sklearn.decomposition import PCA
 
 def literature_data():
     df = pd.read_csv('C:/Users/jakem/OneDrive/Documents/Year 4 Project/Classified Optical Outbursts Data.csv')
@@ -189,8 +190,8 @@ def new_data():
         names_gating, peak_gating, peak_error_gating, total_en_gating, total_en_error_gating, duration_gating, duration_error_gating, P_orb_gating, P_spin_gating,names_dwarf,peak_dwarf,peak_error_dwarf, total_en_dwarf_up,total_en_dwarf_low,duration_dwarf_up,duration_dwarf_low, P_orb_dwarf, P_spin_dwarf,
         names_micro_iron, peak_micro_iron, peak_error_micro_iron, total_en_micro_iron_up, total_en_micro_iron_low, duration_micro_iron_up, duration_micro_iron_low, P_orb_micro_iron, P_spin_micro_iron,names_dwarf_iron,peak_dwarf_iron,peak_error_dwarf_iron, total_en_dwarf_iron_up,total_en_dwarf_iron_low,duration_dwarf_iron_up,duration_dwarf_iron_low, P_orb_dwarf_iron, P_spin_dwarf_iron)
 
-def ASAS_SN_19bh(index):
-    search_result = lk.search_lightcurve('ASASSN -19bh', mission='TESS')
+def ASAS_SN_19bh(index,name):
+    search_result = lk.search_lightcurve(name, mission='TESS')
     lc = search_result[index].download()
     exptime = search_result.table['exptime'][index]
     sap_lc = lc.SAP_FLUX
@@ -203,6 +204,7 @@ def ASAS_SN_19bh(index):
     flux_error = sap_lc.flux_err.value[good_quality_mask]  
 
     return time,flux,exptime,flux_error
+
 
 def ASAS_SN_delt():
     file = 'C:/Users/jakem/OneDrive/Documents/Year 4 Project/Compiled ASASSN Data/IPs_ASAS-SN_data/IPs_ASAS-SN_data/DQ_Her_ASAS-SN_LC.csv'
@@ -229,8 +231,8 @@ def ASAS_SN_delt():
     
     return delta_sorted,cdf
 
-def LC_model():
-    time,flux,exptime,flux_error = ASAS_SN_19bh(1)
+def LC_model(name):
+    time,flux,exptime,flux_error = ASAS_SN_19bh(1,name)
     time_mask = (time >= 2347) & (time <= 2357)
     time = time[time_mask]
     flux = flux[time_mask]
@@ -238,9 +240,11 @@ def LC_model():
     factor = (3.5*10**(34))/np.max(flux)
     flux = flux*factor
     
-    plt.scatter(time,flux,s=1,color = "black")
+    
     
     delta_sorted, cdf = ASAS_SN_delt()
+    
+    plt.scatter(time,flux,s=1,color = "black", label = "Original Data")
     
     time_array = np.empty(0)
     flux_array = np.empty(0)
@@ -257,11 +261,17 @@ def LC_model():
         sim_flux = flux[idx]
         flux_array = np.append(flux_array,sim_flux)
     
-    plt.scatter(time_array,flux_array,color = "red", s=5)
+    plt.scatter(time_array,flux_array,color = "red", s=5,label = "Simulated Points")
+    plt.xlabel("Time (BJD-2475000)")
+    plt.ylabel("Luminosity (erg/s)")
+    plt.legend()
     plt.show()
     peak_lumi = np.max(flux_array)
     
-    threshold = 0.77*10**(34)
+    
+    avg_flux_TESS = np.mean(flux)
+    print("average",avg_flux_TESS)
+    threshold = 1.1*avg_flux_TESS
     above_threshold = np.where(flux_array > threshold)[0]
     if len(above_threshold) == 0:
         print("No points above threshold — no outburst detected.")
@@ -311,14 +321,14 @@ def LC_model():
     return peak_lumi, integral_low,integral_up,outburst_duration,duration_lower
         
         
-def simulation(iterations):
+def simulation(iterations,name):
     lum_array = np.empty(0)
     int_up_array = np.empty(0)
     int_low_array = np.empty(0)
     dur_up_array = np.empty(0)
     dur_low_array = np.empty(0)
     for i in range(0,iterations):       
-        peak_lumi,integral_low, integral_up,duration_upper,duration_lower = LC_model()
+        peak_lumi,integral_low, integral_up,duration_upper,duration_lower = LC_model(name)
         lum_array = np.append(lum_array,peak_lumi)
         int_up_array = np.append(int_up_array,integral_up)
         int_low_array = np.append(int_low_array,integral_low)
@@ -338,11 +348,11 @@ def simulation(iterations):
     
     return avg_int_per_run,lum_array, int_low_array
     
-def simulation_comparison(iterations):
+def simulation_comparison(iterations,name):
     names_micro1, peak_micro1, peak_error_micro1, total_en_micro1, total_en_error_micro1, duration_micro1, duration_error_micro1,names_donor1, peak_donor1, peak_error_donor1, total_en_donor1, total_en_error_donor1, duration_donor1, duration_error_donor1,names_gating1, peak_gating1, peak_error_gating1, total_en_gating1, total_en_error_gating1, duration_gating1, duration_error_gating1, names_dwarf1,peak_dwarf1,peak_error_dwarf1, total_en_dwarf1,total_en_error_dwarf1,duration_dwarf1,duration_error_dwarf1 = literature_data()
     names_micro, peak_micro, peak_error_micro, total_en_micro_up, total_en_micro_low, duration_micro_up, duration_micro_low,P_orb_micro, P_spin_micro,names_donor, peak_donor, peak_error_donor, total_en_donor, total_en_error_donor, duration_donor, duration_error_donor,names_gating, peak_gating, peak_error_gating, total_en_gating, total_en_error_gating, duration_gating, duration_error_gating, P_orb_gating,P_spin_gating,names_dwarf,peak_dwarf,peak_error_dwarf, total_en_dwarf_up,total_en_dwarf_low,duration_dwarf_up,duration_dwarf_low,P_orb_dwarf,P_spin_dwarf,names_micro_iron, peak_micro_iron, peak_error_micro_iron, total_en_micro_iron_up, total_en_micro_iron_low, duration_micro_iron_up, duration_micro_iron_low, P_orb_micro_iron, P_spin_micro_iron,names_dwarf_iron,peak_dwarf_iron,peak_error_dwarf_iron, total_en_dwarf_iron_up,total_en_dwarf_iron_low,duration_dwarf_iron_up,duration_dwarf_iron_low, P_orb_dwarf_iron, P_spin_dwarf_iron = new_data()
     
-    energy, lum_array, low_energies = simulation(iterations)
+    energy, lum_array, low_energies = simulation(iterations,name)
     
     midpoint_en_micro = (total_en_micro_up+total_en_micro_low)/2
     xerr_lower_micro = midpoint_en_micro - total_en_micro_low
@@ -369,20 +379,46 @@ def simulation_comparison(iterations):
     xerr_lower_dwarf_dur = midpoint_dur_dwarf_iron - duration_dwarf_iron_low
     xerr_upper_dwarf_dur = duration_dwarf_iron_up - midpoint_dur_dwarf_iron
     
+    central_x = 1.2*10**(39)
+    central_y = 3.5*10**(34)
+    
+    (m1x, m1y), dir1, scale1 = principal_direction(energy, lum_array)
+    dx1 = dir1[0] * scale1
+    dy1 = dir1[1] * scale1
+    #plt.arrow(m1x, m1y, dx1, dy1,
+    #color='red', width=0,  # or a small number if you want thickness
+    #head_width=0.07*m1y, length_includes_head=True,
+    #label='Dist 1 direction'
+    #)
+    #plt.arrow(m1x, m1y, dx1, dy1,
+    #      width=0.02*10**(np.floor(np.log10(np.mean(lum_array)))),
+    #      head_width=0.05*abs(dy1),
+    #      color='red', alpha=0.8, label='Principal direction')
+    
+    plt.scatter(energy,lum_array, color = "orange", alpha = 0.3, label = "Simulations")
+    plt.scatter(central_x,central_y,color = "red",marker = "x", label = "ASAS-SN 19bh")
+    plt.xscale("log")
+    plt.yscale("log")
+    plt.xlabel("Total Optical Energy (erg)")
+    plt.ylabel("Peak Optical Luminosity (erg/s)")
+    plt.legend()
+    plt.show()
     
     
-    
-    plt.errorbar(midpoint_en_micro_iron, peak_micro_iron,xerr = [xerr_lower_micro_iron, xerr_upper_micro_iron],yerr = peak_error_micro_iron,fmt = 'o', markersize = 6, elinewidth = 0.5,color = 'grey', label = 'Ironclad IPs')
-    plt.errorbar(midpoint_en_dwarf_iron, peak_dwarf_iron,xerr = [xerr_lower_dwarf_iron, xerr_upper_dwarf_iron],yerr = peak_error_dwarf_iron,fmt = 'o', markersize = 6, elinewidth = 0.5,color = 'grey')
+    plt.errorbar(midpoint_en_micro_iron, peak_micro_iron,xerr = [xerr_lower_micro_iron, xerr_upper_micro_iron],yerr = peak_error_micro_iron,fmt = '^', markersize = 6, elinewidth = 0.5,color = 'blue', label = 'Micronova (new)')
+    plt.errorbar(midpoint_en_dwarf_iron, peak_dwarf_iron,xerr = [xerr_lower_dwarf_iron, xerr_upper_dwarf_iron],yerr = peak_error_dwarf_iron,fmt = '^', markersize = 6, elinewidth = 0.5,color = 'red', label = "Dwarf nova (new)")
     
     plt.errorbar(total_en_micro1,peak_micro1,xerr = total_en_error_micro1, yerr= peak_error_micro1,label = "Micronovae",color = "blue",markersize=6, fmt = 'o',elinewidth=0.5, fillstyle = 'none')
     plt.errorbar(total_en_dwarf1, peak_dwarf1,xerr=total_en_error_dwarf1, yerr=peak_error_dwarf1,label="Dwarf Novae", color="red", markersize=6, fmt='o',elinewidth=0.5, fillstyle = 'none')
     plt.errorbar(total_en_gating1, peak_gating1,xerr=total_en_error_gating1, yerr=peak_error_gating1,label="Magnetic Gating", color="green", markersize=6, fmt='o',elinewidth=0.5, fillstyle = 'none')
 
 
-    central_x = 1.2*10**(39)
-    central_y = 3.5*10**(34)
-    plt.scatter(low_energies,lum_array, color = "orange", alpha = 0.3, label = "Simulations")
+    nonzero_energy = np.count_nonzero(energy)
+    print("From", len(energy), "runs, ASAS-SN will detect on average", nonzero_energy, "bursts")
+    
+    print(np.count_nonzero(lum_array))
+    
+    plt.scatter(energy,lum_array, color = "orange", alpha = 0.3, label = "Simulations")
     plt.scatter(central_x,central_y,color = "red",marker = "x", label = "ASAS-SN 19bh")
     
     plt.xlabel("Total Optical Energy (erg)")
@@ -396,8 +432,29 @@ def simulation_comparison(iterations):
     plt.errorbar(midpoint_en_micro_iron, midpoint_dur_micro_iron,xerr = [xerr_lower_micro_iron, xerr_upper_micro_iron],yerr = [xerr_lower_micro_dur,xerr_upper_micro_dur],fmt = 'o', markersize = 6, elinewidth = 0.5,color = 'grey', label = 'Ironclad IPs')
     plt.errorbar(midpoint_en_dwarf_iron, midpoint_dur_dwarf_iron,xerr = [xerr_lower_dwarf_iron, xerr_upper_dwarf_iron],yerr = [xerr_lower_dwarf_dur,xerr_upper_dwarf_dur],fmt = 'o', markersize = 6, elinewidth = 0.5,color = 'grey')
     plt.xscale("log")
+    plt.show()
+    return m1x, m1y, dir1, scale1
+    
+def principal_direction(x, y):
+    X = np.column_stack((x, y))
+    pca = PCA(n_components=2)
+    pca.fit(X)
+
+    # The first component is the direction of largest variance
+    dir_vector = pca.components_[0]  # shape (2,)
+    
+    # Mean of the distribution
+    mean_x, mean_y = X.mean(axis=0)
+    
+    # A simple scale: fraction of the data's spread
+    # (Tune this to make the arrow look good on your plot)
+    x_range = x.max() - x.min()
+    y_range = y.max() - y.min()
+    scale_factor = 0.3 * np.sqrt(x_range**2 + y_range**2)
+    
+    return (mean_x, mean_y), dir_vector, scale_factor
     
 #LC_model()
 #ASAS_SN_delt()
 #simulation(100)
-simulation_comparison(20)
+simulation_comparison(200, 'ASASSN -19bh')
