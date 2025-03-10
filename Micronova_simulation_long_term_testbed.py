@@ -31,6 +31,7 @@ from ztfquery import lightcurve
 import glob
 import random
 from sklearn.decomposition import PCA
+from scipy.special import erf
 
 def gen_scatter(average_value, time_min,time_max, time_step, scatter_std):
     time = np.arange(time_min, time_max, time_step/(3600*24))
@@ -45,13 +46,18 @@ def find_consecutive_bursts(flux, threshold, min_consecutive=3):
     return list(burst_indices)  # Ensure it's a list
 
 
-def ASASSN_data():
+def ASASSN_data(cutoff):
     file = 'C:/Users/jakem/OneDrive/Documents/Year 4 Project/Compiled ASASSN Data/IPs_ASAS-SN_data/IPs_ASAS-SN_data/DQ_Her_ASAS-SN_LC.csv'
     df = pd.read_csv(file)
     df = df[df['mag_err'] != 99.99]
     time = df.iloc[:, 0]
     time = time-2457000
+    time_mask = time >= cutoff
     flux = df.iloc[:, 7]
+    
+    time = time[time_mask]
+    flux = flux[time_mask]
+    
     band = df.iloc[:, 9]
     flux_error = df.iloc[:, 8]
     return time,flux,flux_error
@@ -137,7 +143,7 @@ def synthesize_tess_over_asassn(tess_time, tess_flux,start_time, end_time,sequen
     #plt.scatter(time, flux, s=1, label="Full curve")   # the main data
     #plt.scatter(time_A, matched_flux, color="red", s=8, label="ASASSN cadence")
     #plt.plot(time,threshold_line,linestyle = "--",lw=3)
-    #plt.legend()
+    #plt.legend(loc="upper left")
     #plt.show()
     
     
@@ -145,42 +151,83 @@ def synthesize_tess_over_asassn(tess_time, tess_flux,start_time, end_time,sequen
     print(burst_list)
     return burst_list
 
+def saturating_exp(x, y0, A, k, x0):
+    # y(x) = y0 + A * (1 - exp(-k*(x - x0)))
+    # For x < x0, this might dip below y0 if not carefully constrained,
+    # so often we keep x0 <= min(x) or handle that logic. 
+    return y0 + A * (1.0 - np.exp(-k*(x - x0)))
+
     
     
 
-    
+
     
 time,flux,exptime,flux_error = ASAS_SN_19bh(1, "ASASSN -19bh")
-    
-time_A,flux_A,error_A = ASASSN_data()
-    
-    
-start_time = time_A.iloc[0]
-end_time = time_A.iloc[-1]
-iterations = 50
-equilibrium = 100
-burst_detection = np.empty(0)
 
-for i in range(0,iterations-1):
-    rand_int = random.randint(0, 365)
-    sign = random.choice([-1, 1])
-    sequence_start =  equilibrium + sign * rand_int
+cutoff_times = np.linspace(0,3300,25)
+print(cutoff_times)
+probabilities = np.zeros(len(cutoff_times))
 
-    # Synthesize TESS data across that entire range
-    burst_list = synthesize_tess_over_asassn(
-        time,
-        flux,
-        start_time,
-        end_time,
-        sequence_start
-        )
-    if len(burst_list)>0:
-        burst_detection = np.append(burst_detection,1)
-    else:
-        burst_detection = np.append(burst_detection,0)
+for j in range(0,len(cutoff_times)):
+    
+    time_A,flux_A,error_A = ASASSN_data(cutoff_times[j])
+    
+    
+    start_time = time_A.iloc[0]
+    end_time = time_A.iloc[-1]
+    iterations = 51
+    equilibrium = start_time+365
+    burst_detection = np.empty(0)
+    
+    for i in range(0,iterations-1):
+        rand_int = random.randint(0, 365)
+        sign = random.choice([-1, 1])
+        sequence_start =  equilibrium + sign * rand_int
         
-count_of_ones = np.sum(burst_detection == 1)
-print("ASAS-SN detects a burst", count_of_ones, "times in", iterations-1, "runs")
+        # Synthesize TESS data across that entire range
+        burst_list = synthesize_tess_over_asassn(
+            time,
+            flux,
+            start_time,
+            end_time,
+            sequence_start
+            )
+        if len(burst_list)>0:
+            burst_detection = np.append(burst_detection,1)
+        else:
+            burst_detection = np.append(burst_detection,0)
+        
+    count_of_ones = np.sum(burst_detection == 1)
+    print("ASAS-SN detects a burst", count_of_ones, "times in", iterations-1, "runs")
+    print(count_of_ones/iterations)
+    probabilities[j] = count_of_ones/iterations
+
+total_times = (end_time+-269.96982999984175)-cutoff_times
+
+p0 = [0.0, 1.0, 0.001, total_times.min()]  # example
+
+# 4) Fit the function to your data
+popt, pcov = curve_fit(saturating_exp, total_times, probabilities, p0=p0)
+
+# 5) Extract the best-fit parameters
+y0_opt, A_opt, k_opt, x0_opt = popt
+print("Fitted parameters:")
+print("y0 =", y0_opt)
+print("A  =", A_opt)
+print("k  =", k_opt)
+print("x0 =", x0_opt)
+
+# 6) Generate a smooth curve for plotting
+x_fit = np.linspace(total_times.min(), total_times.max(), 200)
+y_fit = saturating_exp(x_fit, *popt)
+
+
+plt.scatter(total_times,probabilities, s=10)
+plt.plot(x_fit, y_fit)
+plt.xlabel("Total Time (days)")
+plt.ylabel("Probability of Detection")
+plt.legend()
+plt.show()
 
     
 
