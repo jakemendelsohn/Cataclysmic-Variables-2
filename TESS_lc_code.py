@@ -15,6 +15,8 @@ from ztfquery import query
 import pandas as pd
 from scipy.fft import fft, fftfreq
 import matplotlib.colors as colors
+from matplotlib.gridspec import GridSpec
+from scipy.stats import binned_statistic
 
 
 def sector_data(index):
@@ -37,7 +39,7 @@ def sector_data(index):
     return time,flux,exptime,flux_error
 
 def Kepler_data(index):
-    search_result = lk.search_lightcurve('04 07 4.080 +18 55 37.20',mission = 'K2',radius = 20)
+    search_result = lk.search_lightcurve("ktwo203620516",radius = 300, mission = 'K2')
     print(search_result)
     lc = search_result[index].download()
     exptime = search_result.table['exptime'][index]
@@ -67,6 +69,14 @@ def stitch_flatten(indeces):
     flux_errors = []
     labels = ["sector 43", "sector 44", "sector 70", "sector 71"]   #adjust accordingly
     search_result = lk.search_lightcurve('04 07 4.080 +18 55 37.20', mission='TESS')
+    plt.rcParams.update({
+    "font.size": 12,           # Overall font size
+    "axes.labelsize": 12,      # Axis label font size
+    "xtick.labelsize": 12,     # X tick label font size
+    "ytick.labelsize": 12,     # Y tick label font size
+    "legend.fontsize": 12      # Legend font size
+    })
+
     for i, index in enumerate(indeces):
         processed_lc = search_result[index].download()
         #processed_lc = lc.flatten()
@@ -100,6 +110,53 @@ def stitch_flatten(indeces):
     plt.show()
     
     return flux_stitched,time_stitched,exptime_stitched
+
+def stitched_final_plot(indeces):
+    flux_t,time_t,exxptime_t = stitch_flatten(indeces)
+    flux_43,time_43,exptime_43 = stitch_flatten([indeces[0]])
+    flux_44,time_44,exptime_44 = stitch_flatten([indeces[1]])
+    flux_70,time_70,exptime_70 = stitch_flatten([indeces[2]])
+    flux_71,time_71,exptime_71 = stitch_flatten([indeces[3]])
+    
+    plt.rcParams.update({
+    "font.size": 20,          # Overall font size
+    "axes.labelsize": 20,      # Axis label font size
+    "xtick.labelsize": 20,     # X tick label font size
+    "ytick.labelsize": 20,     # Y tick label font size
+    "legend.fontsize": 20      # Legend font size
+    })
+    #fig, main_ax = plt.subplots(figsize=(8,6))
+    #main_ax.plot(time_43, flux_43, lw=1, label="sector 43")
+    #main_ax.plot(time_44, flux_44, lw=1, label="sector 44")
+    #main_ax.plot(time_70, flux_70, lw=1, label="sector 70")
+    #main_ax.plot(time_71, flux_71, lw=1, label="sector 71")
+    #main_ax.set_xlabel("Time (BJD-2457000, days)")
+    #main_ax.set_ylabel("Flux (e/s)")
+    #main_ax.legend()
+    
+    fig, (inset_ax1, inset_ax2) = plt.subplots(1, 2, figsize=(10, 4))
+    
+    inset_ax1.plot(time_43, flux_43, label="sector 43")
+    inset_ax1.plot(time_44, flux_44, label="sector 44")
+    inset_ax1.set_xlabel("Time (BJD-2457000, days)")
+    inset_ax1.set_ylabel("Flux (e/s)")
+    #inset_ax1.set_title("Sectors 43 & 44", fontsize=10)
+    inset_ax1.tick_params(labelsize=8)
+    #inset_ax1.legend(fontsize=8)
+    
+    # --- 3) Add second inset (Sectors 70 & 71) ---
+    inset_ax2.plot(time_70, flux_70, label="sector 70",color = "green")
+    inset_ax2.plot(time_71, flux_71, label="sector 71",color = "#d62728")
+    inset_ax2.set_xlabel("Time (BJD-2457000, days)")
+    #inset_ax2.set_ylabel("Flux (e/s)")
+    #inset_ax2.set_title("Sectors 70 & 71", fontsize=10)
+    inset_ax2.tick_params(labelsize=8)
+    #inset_ax2.legend(fontsize=8)
+    
+    inset_ax1.tick_params(labelsize=20)  # Increase both x & y tick labels
+    inset_ax2.tick_params(labelsize=20)
+    plt.show()
+    
 
 
 
@@ -214,11 +271,12 @@ def rebin_lightcurve(time, rate, error, back, err_back, bin_size):
 
 def ZTF_data():
     zquery = query.ZTFQuery()
-    lcq = lightcurve.LCQuery.from_position(61.767, +18.927, 5)
+    lcq = lightcurve.LCQuery.from_position(17.9307637035875, +15.0119004204009, 20)
     ZTF_data = pd.DataFrame({'JD' : lcq.data.mjd+2400000.5, 'Magnitude' : lcq.data.mag, 'Magnitude_Error' : lcq.data.magerr, "Filter" : lcq.data.filtercode})
     #data = lcq.download_data()
     #lcq = lightcurve.LCQuery(data)
     df = ZTF_data
+    print(df)
     filter_list = ["zg", "zr", "zi"]
     colour = ["teal", "red", "black"]
     for filter, colour in zip(filter_list, colour):     
@@ -288,7 +346,7 @@ def Lomb_Scargle(time,flux,exptime):
     num_frequency_points = 100000  # You can adjust this based on the desired resolution
     frequency = np.linspace(min_freq, max_freq, num_frequency_points)
     ls = LombScargle(time, flux)
-    power = ls.power(frequency,normalization = "model")# Manually compute power without autopower
+    power = ls.power(frequency)# Manually compute power without autopower
     print(power)
     # Plot the Lomb-Scargle Periodogram
     plt.figure(figsize=(10, 6))
@@ -300,7 +358,7 @@ def Lomb_Scargle(time,flux,exptime):
     #plt.yscale('linear')
     #plt.xscale('linear')
     plt.xlim(0,20)
-    plt.ylim(0,0.1)
+    plt.ylim(0,0.06)
     
     # Set axis labels
     plt.xlabel('Frequency (c/d)')
@@ -325,26 +383,26 @@ def Lomb_Scargle(time,flux,exptime):
     y_vals = np.linspace(0,13,1000)
     for freq in orbital_frequencies:
         x_vals = np.linspace(freq,freq,1000)
-        plt.plot(x_vals,y_vals,linestyle = ":", color = 'blue')
+        #plt.plot(x_vals,y_vals,linestyle = ":", color = 'blue')
     for freq1 in spin_frequencies:
         x_vals = np.linspace(freq1,freq1,1000)
-        plt.plot(x_vals,y_vals,linestyle = ":", color = 'red')
+        #plt.plot(x_vals,y_vals,linestyle = ":", color = 'red')
     for freq2 in beat_frequencies:
         x_vals = np.linspace(freq2,freq2,1000)
-        plt.plot(x_vals,y_vals,linestyle = ":", color = 'black')
+        #plt.plot(x_vals,y_vals,linestyle = ":", color = 'black')
     for freq3 in freq_int_manual2:
         x_vals = np.linspace(freq3,freq3,1000)
-        plt.plot(x_vals,y_vals,linestyle = ':', color = 'green')
+        #plt.plot(x_vals,y_vals,linestyle = ':', color = 'green')
     #print("The remaining frequency peaks are", remaining_frequencies)
     
     
-    plt.plot([], [], linestyle=":", color='blue', label='Orbital Frequencies')  # Add one blue line to the legend
-    plt.plot([], [], linestyle=":", color='red', label='Spin Frequencies')      # Add one red line to the legend
-    plt.plot([], [], linestyle=":", color='green', label='Remaining Frequencies')
-    plt.plot([], [], linestyle=":", color='black', label='Beat Frequencies')
-    plt.legend()
+    #plt.plot([], [], linestyle=":", color='blue', label='Orbital Frequencies')  # Add one blue line to the legend
+    #plt.plot([], [], linestyle=":", color='red', label='Spin Frequencies')      # Add one red line to the legend
+    #plt.plot([], [], linestyle=":", color='green', label='Remaining Frequencies')
+    #plt.plot([], [], linestyle=":", color='black', label='Beat Frequencies')
+    #plt.legend()
     # Show the plot
-    plt.show()
+    plt.show
     return frequency,power,orbital_frequencies,spin_frequencies,new_frequencies,beat_frequencies
 
 def Lomb_Scargle_Annotated(time,flux,exptime):
@@ -356,30 +414,181 @@ def Lomb_Scargle_Annotated(time,flux,exptime):
     power = ls.power(frequency,normalization = "model")# Manually compute power without autopower
     print(power)
     # Plot the Lomb-Scargle Periodogram
-    plt.figure(figsize=(10, 6))
-    plt.plot(frequency, power*frequency, 'k', lw=1)
+    plt.figure(figsize=(22, 6))
+    plt.rcParams.update({
+    "font.size": 24,          # Overall font size
+    "axes.labelsize": 24,      # Axis label font size
+    "xtick.labelsize": 24,     # X tick label font size
+    "ytick.labelsize": 24,     # Y tick label font size
+    "legend.fontsize": 24      # Legend font size
+    })
+    plt.plot(frequency, power, 'k', lw=1,color = 'blue')
     
-    peaks = [7.63 ,8.18,14.32,15.25,16.36]  # Example peaks in frequency
-    labels = [r'$\Omega - f_{prec}$', r'$\Omega$','?',r'$2(\Omega - f_{prec}$)',r'$2\Omega$']
-    heights = [0.16,0.05,0.04,0.06,0.05]
+    peaks = [0.56,6.678,7.624,8.18,15.247,16.355]  # Example peaks in frequency
+    labels_A = [r'$2f_{prec}$',r'$\omega-2f_{prec}$','?',r'$\omega-f_{prec}$','2?',r'$2(\omega-f_{prec})$']
+    labels_B = [r'$2(\omega-\Omega)$',r'$\omega-2f_L$','?',r'$\Omega$','2?',r'$2\Omega$']
+
+    # Offset multipliers (adjust if overlapping occurs)
+    offsets_A = [1,0.7,1.2,0.5,0.6,1.1]  # Higher
+    offsets_B = [0.9,0.58,1.08,0.38,0.48,0.95]  # Lower
+    #heights = [0.02,0.048,0.007,0.013,0.02,0.008]
     
-    for peak, label, height in zip(peaks, labels, heights):
-        peak_power = np.interp(peak, frequency, power)  # Find the power at the peak frequency
-        plt.annotate(label, xy=(peak, height-0.01), xytext=(peak, height),
-                 textcoords='data', ha='center', fontsize=10,
-                 arrowprops=dict(arrowstyle='->',  # Draw a simple arrow
-            color='black',
-            lw=1.0            # Line width
-        ))
+    # Get max power to determine annotation height
+    ymax = max(power)
+        
+    # Add vertical lines and annotations
+    for i, (peak, label_a, label_b) in enumerate(zip(peaks, labels_A, labels_B)):
+        # Draw vertical dashed line
+        plt.axvline(peak, linestyle='dotted', color='gray', alpha=0.6)
+        
+        # Default x offset
+        x_shift = 0  
+        
+        # Custom horizontal shift just for the 8.18 c/d peak
+        if np.isclose(peak, 8.18, atol=0.01):  # or use: if i == 3:
+            x_shift = 0.25  # Adjust as needed
+
+        # Top label
+        plt.annotate(label_a,
+                xy=(peak, ymax * offsets_A[i]),
+                xytext=(peak + x_shift, ymax * offsets_A[i]),
+                textcoords='data',
+                ha='center', va='bottom',
+                fontsize=24, color='red')
+
+       # Bottom label
+        plt.annotate(label_b,
+                    xy=(peak, ymax * offsets_B[i]),
+                    xytext=(peak + x_shift, ymax * offsets_B[i]),
+                    textcoords='data',
+                    ha='center', va='bottom',
+                    fontsize=24, color='black')
     
-    plt.xlim(-0.5,20)
-    plt.ylim(0,0.2)
+    #for peak, label, height in zip(peaks, labels, heights):
+     #   peak_power = np.interp(peak, frequency, power)  # Find the power at the peak frequency
+      #  plt.annotate(label, xy=(peak, height-0.006), xytext=(peak, height),
+       #          textcoords='data', ha='center', fontsize=24,
+        #         arrowprops=dict(arrowstyle='->',  # Draw a simple arrow
+         #   color='black',
+          #  lw=1.0,# Line width
+        #))
+    
+    #peak_x,peak_y = 8.453,0.008
+    #plt.annotate(
+   # r'$\omega-f_{prec}$',
+    #xy=(peak_x, peak_y),
+    #xytext=(peak_x-2, peak_y+0.003),
+    #arrowprops=dict(arrowstyle='->'),
+   # fontsize = 24
+     #No rotation here, so text remains horizontal
+#)
+    #peak_x,peak_y = 8.453,0.006
+    #plt.annotate(
+    #r'$\omega$',
+    #xy=(peak_x, peak_y),
+    #xytext=(peak_x+1, peak_y+0.001),
+    #arrowprops=dict(arrowstyle='->'),
+    #fontsize = 24
+     #No rotation here, so text remains horizontal
+#)
+    
+    plt.xlim(-0.5,17)
+    plt.ylim(0,0.023)
     
     # Set axis labels
     plt.xlabel('Frequency (c/d)')
-    plt.ylabel('Power x Frequency')
+    plt.ylabel('Power')
     # Set plot title
-    plt.title('Lomb-Scargle Periodogram (Specified Frequency Range)')
+    #plt.title('Lomb-Scargle Periodogram (Specified Frequency Range)')
+    
+def Lomb_Scargle_DualAnnotated(time, flux, exptime):
+    min_freq, max_freq = frequency_range(time,flux,exptime)
+    # Compute the Lomb-Scargle Periodogram within the specified frequency range
+    num_frequency_points = 100000  # You can adjust this based on the desired resolution
+    frequency = np.linspace(min_freq, max_freq, num_frequency_points)
+    ls = LombScargle(time, flux)
+    power = ls.power(frequency,normalization = "model")# Manually compute power without autopower
+    print(power)
+    # Plot the Lomb-Scargle Periodogram
+    plt.figure(figsize=(22, 6))
+    plt.rcParams.update({
+    "font.size": 24,          # Overall font size
+    "axes.labelsize": 24,      # Axis label font size
+    "xtick.labelsize": 24,     # X tick label font size
+    "ytick.labelsize": 24,     # Y tick label font size
+    "legend.fontsize": 24      # Legend font size
+    })
+    plt.plot(frequency, power, 'k', lw=1,color = 'blue')
+    
+    peaks = [0.27,0.8913,6.678,7.56,8.181,8.453,16.355]  # Example peaks in frequency
+    labels_A = [r'$f_{prec}$',r'$\omega - \Omega$',r'$\omega-2f_{prec}$',r'$\Omega$',r'$\omega-f_{prec}$',r'$\omega$',r'$2\Omega$']
+    labels_B = [r'$\omega - \Omega$',r'$f_L$',r'$\omega - 2f_L$', r'$\omega - f_L$',r'$\Omega$',r'$\omega$',r'$2(\omega-f_{prec})$']
+
+    # Offset multipliers (adjust if overlapping occurs)
+    offsets_A = [1, 1.22, 0.68, 0.9, 1.23,0.7, 1.22]  # Higher
+    offsets_B = [0.9, 1.11, 0.55, 0.8, 1.12, 0.58,1.05]  # Lower
+    #heights = [0.02,0.048,0.007,0.013,0.02,0.008]
+    
+    # Get max power to determine annotation height
+    ymax = max(power)
+        
+    # Add vertical lines and annotations
+    for i, (peak, label_a, label_b) in enumerate(zip(peaks, labels_A, labels_B)):
+        # Draw vertical dashed line
+        plt.axvline(peak, linestyle='dotted', color='gray', alpha=0.6)
+        
+        # Add Interpretation A (top)
+        plt.annotate(label_a,
+                     xy=(peak, ymax * offsets_A[i]),
+                     xytext=(peak, ymax * offsets_A[i]),
+                     textcoords='data',
+                     ha='center', va='bottom',
+                     fontsize=24, color='red')
+        
+        # Add Interpretation B (below A)
+        plt.annotate(label_b,
+                     xy=(peak, ymax * offsets_B[i]),
+                     xytext=(peak, ymax * offsets_B[i]),
+                     textcoords='data',
+                     ha='center', va='bottom',
+                     fontsize=24, color='black')
+    
+    #for peak, label, height in zip(peaks, labels, heights):
+     #   peak_power = np.interp(peak, frequency, power)  # Find the power at the peak frequency
+      #  plt.annotate(label, xy=(peak, height-0.006), xytext=(peak, height),
+       #          textcoords='data', ha='center', fontsize=24,
+        #         arrowprops=dict(arrowstyle='->',  # Draw a simple arrow
+         #   color='black',
+          #  lw=1.0,# Line width
+        #))
+    
+    #peak_x,peak_y = 8.453,0.008
+    #plt.annotate(
+   # r'$\omega-f_{prec}$',
+    #xy=(peak_x, peak_y),
+    #xytext=(peak_x-2, peak_y+0.003),
+    #arrowprops=dict(arrowstyle='->'),
+   # fontsize = 24
+     #No rotation here, so text remains horizontal
+#)
+    #peak_x,peak_y = 8.453,0.006
+    #plt.annotate(
+    #r'$\omega$',
+    #xy=(peak_x, peak_y),
+    #xytext=(peak_x+1, peak_y+0.001),
+    #arrowprops=dict(arrowstyle='->'),
+    #fontsize = 24
+     #No rotation here, so text remains horizontal
+#)
+    
+    plt.xlim(-0.5,17)
+    plt.ylim(0,0.023)
+    
+    # Set axis labels
+    plt.xlabel('Frequency (c/d)')
+    plt.ylabel('Power')
+    # Set plot title
+    #plt.title('Lomb-Scargle Periodogram (Specified Frequency Range)')
 
 def bootstrap_lomb_scargle(time, flux, num_iterations=1000, num_freqs=10000,exptime = 120):
     # Frequency range
@@ -429,7 +638,7 @@ def gaussian(x, a, mu, sigma):
     return a * np.exp(-0.5 * ((x - mu) / sigma)**2)
     
 
-def bootstrap_errors(time, flux, exptime, num_freqs=10000, num_bootstraps=1000, f_min = 8.18, f_max = 8.2):
+def bootstrap_errors(time, flux, exptime, num_freqs=10000, num_bootstraps=1000, f_min = 7.5, f_max = 7.7):
     # Stack time and flux for easier resampling
     time_flux_pairs = np.column_stack((time, flux))
     min_freq, max_freq = frequency_range(time, flux, exptime)
@@ -478,7 +687,7 @@ def bootstrap_errors(time, flux, exptime, num_freqs=10000, num_bootstraps=1000, 
         gaussian, 
         filtered_bin_centers, 
         filtered_bin_heights, 
-        p0=[max(bin_heights),8.18, 0.01],
+        p0=[max(bin_heights),7.56, 0.01],
         maxfev=2000  # optionally increase the max function evals
     )
     except RuntimeError:
@@ -508,11 +717,18 @@ def bootstrap_errors(time, flux, exptime, num_freqs=10000, num_bootstraps=1000, 
         print(f"Fitted Gaussian Parameters: a={a_fit:.5f}, mu={mu_fit:.5f}, sigma={sigma_fit:.5f}")
     return bin_centers,bin_heights, popt
 
-def bootstrap_errors_multiple(indices,f_min = 8.4,f_max = 8.5):
+def bootstrap_errors_multiple(indices,f_min = 7.5,f_max = 7.7):
     # Use lists instead of np.array for initial storage
     centres_array = []
     heights_array = []
     popt_array = []
+    plt.rcParams.update({
+    "font.size": 20,          # Overall font size
+    "axes.labelsize": 20,      # Axis label font size
+    "xtick.labelsize": 20,     # X tick label font size
+    "ytick.labelsize": 20,     # Y tick label font size
+    "legend.fontsize": 20      # Legend font size
+    })
 
     # Loop through each index in the dataset
     for i in range(len(indices)):
@@ -538,7 +754,7 @@ def bootstrap_errors_multiple(indices,f_min = 8.4,f_max = 8.5):
         ax.text(
         0.5, 0.9, sector_labels[j],
         transform=ax.transAxes,  # so x, y are in [0..1] relative to Axes
-        fontsize=12, 
+        fontsize=18, 
         va='top',    # vertical alignment 
         ha='center'    # horizontal alignment
         )
@@ -569,12 +785,19 @@ def bootstrap_errors_multiple(indices,f_min = 8.4,f_max = 8.5):
                 )   
             
             # Add labels and grid
-            ax.set_ylabel("RMS Power", fontsize=10)
-            ax.legend(fontsize=8)
+            #ax.set_ylabel("RMS Power", fontsize=10)
+            ax.legend(fontsize=14)
+    fig.text(
+    -0.01,            # x-position in figure coords
+    0.5,             # y-position in figure coords
+    'Count',
+    va='center',
+    rotation='vertical'
+    )
         
 
     # Finalize plot
-    axes[-1].set_xlabel("Frequency [d$^{-1}$]", fontsize=10)
+    axes[-1].set_xlabel("Frequency [d$^{-1}$]", fontsize=20)
     plt.tight_layout()
     plt.show()
         
@@ -681,48 +904,6 @@ def mulitple_sector_LS(index_list):
     
     return times, fluxes, orbitals, spins, news
 
-def Lomb_Scargle_2D(time, flux, exptime, window_size, step_size, min_freq, max_freq):
-    # Parameters for the frequency range
-    num_frequency_points = 1000  # Increase if higher frequency resolution is needed
-    frequencies = np.linspace(min_freq, max_freq, num_frequency_points)
-
-    # Prepare to store the 2D power spectrum (rows: time windows, columns: frequencies)
-    power_spectrum_2D = []
-
-    # Sliding window through the data
-    time_start = min(time)
-    time_end = max(time)
-    current_time = time_start
-
-    # Loop through the time windows
-    while current_time + window_size <= time_end:
-        # Find indices of the data within the current window
-        window_mask = (time >= current_time) & (time < current_time + window_size)
-        time_window = time[window_mask]
-        flux_window = flux[window_mask]
-
-        # Compute the Lomb-Scargle periodogram for the current window
-        ls = LombScargle(time_window, flux_window)
-        power = ls.power(frequencies)
-        power_spectrum_2D.append(power)
-
-        # Move the window
-        current_time += step_size
-
-    # Convert the list of power spectra into a 2D array
-    power_spectrum_2D = np.array(power_spectrum_2D)
-
-    # Generate the time axis (midpoints of each time window)
-    time_axis = np.arange(time_start + window_size / 2, time_end, step_size)
-
-    # Plot the 2D power spectrum
-    plt.figure(figsize=(10, 6))
-    plt.imshow(power_spectrum_2D.T, aspect='auto', extent=[time_axis[0], time_axis[-1], min_freq, max_freq], origin='lower', cmap='inferno')
-    plt.colorbar(label='Power')
-    plt.xlabel('Time (BTJD)')
-    plt.ylabel('Frequency (cycles/day)')
-    plt.title('2D Lomb-Scargle Power Spectrum')
-    plt.show()
 
 def peak_finder(frequency, power,  height_threshold=0.01, prominence=0.001):
     y = frequency*power
@@ -797,8 +978,17 @@ def bin_folded_data(phase, flux, num_bins=50):
     return bin_centers, bin_means, bin_errors
 
 def phase_fold_binned(time, flux, peak_frequencies):
+    #mask = (time >= 2500) & (time <= 2515)
+    #time = time[mask]
+    #flux  = flux[mask]
     peak_periods = 1/peak_frequencies 
     colors = ['r','g','b','y','c']
+    
+    phase = (time % peak_periods) /peak_periods
+
+    # 2) Plot two cycles of raw data
+    #plt.scatter(phase, flux, color='blue', s=1, alpha=0.5)
+    #plt.scatter(phase + 1, flux, color='blue', s=1, alpha=0.5)
     
     for i in range(0,len(peak_periods)):
         phase = (time % peak_periods[i]) / peak_periods[i]
@@ -807,7 +997,7 @@ def phase_fold_binned(time, flux, peak_frequencies):
                      np.concatenate([bin_means, bin_means]), 
                      yerr=np.concatenate([bin_errors, bin_errors]), 
                      fmt='k.', label=peak_frequencies[i],color = colors[i])
-    plt.legend(title = "Peak Frequencies (c/d)")
+    #plt.legend(title = "Peak Frequencies (c/d)")
     plt.xlabel("Phase")
     plt.ylabel("Flux e/s")
     
@@ -1019,15 +1209,58 @@ def model_fit(time, flux, flux_error):
 
     return params, result.hess_inv, fitted_flux, chi2, reduced_chi2
 
+def Lomb_Scargle_2D(time, flux, exptime, window_size, step_size, min_freq, max_freq):
+    # Parameters for the frequency range
+    num_frequency_points = 1000  # Increase if higher frequency resolution is needed
+    frequencies = np.linspace(min_freq, max_freq, num_frequency_points)
+
+    # Prepare to store the 2D power spectrum (rows: time windows, columns: frequencies)
+    power_spectrum_2D = []
+
+    # Sliding window through the data
+    time_start = min(time)
+    time_end = max(time)
+    current_time = time_start
+
+    # Loop through the time windows
+    while current_time + window_size <= time_end:
+        # Find indices of the data within the current window
+        window_mask = (time >= current_time) & (time < current_time + window_size)
+        time_window = time[window_mask]
+        flux_window = flux[window_mask]
+
+        # Compute the Lomb-Scargle periodogram for the current window
+        ls = LombScargle(time_window, flux_window)
+        power = ls.power(frequencies)
+        power_spectrum_2D.append(power)
+
+        # Move the window
+        current_time += step_size
+
+    # Convert the list of power spectra into a 2D array
+    power_spectrum_2D = np.array(power_spectrum_2D)
+
+    # Generate the time axis (midpoints of each time window)
+    time_axis = np.arange(time_start + window_size / 2, time_end, step_size)
+
+    # Plot the 2D power spectrum
+    plt.figure(figsize=(10, 6))
+    plt.imshow(power_spectrum_2D.T, aspect='auto', extent=[time_axis[0], time_axis[-1], min_freq, max_freq], origin='lower', cmap='inferno')
+    plt.colorbar(label='Power')
+    plt.xlabel('Time (BTJD)')
+    plt.ylabel('Frequency (cycles/day)')
+    plt.title('2D Lomb-Scargle Power Spectrum')
+    plt.show()
+
 def dynamical_power_spec(time,flux,exptime,indeces,window_size,step_size):
-    min_freq,max_freq = 0.5,100
+    min_freq,max_freq = 8,8.7
     #min_freq, max_freq = frequency_range(time,flux,exptime)
     # Compute the Lomb-Scargle Periodogram within the specified frequency range
     num_frequency_points = 10000# You can adjust this based on the desired resolution
     frequency = np.linspace(min_freq, max_freq, num_frequency_points)
     ls = LombScargle(time, flux)
-    power = ls.power(frequency,normalization = "model")
-    plt.plot(frequency,power)
+    power_1 = ls.power(frequency,normalization = "model")
+    plt.plot(frequency,power_1)
     plt.xlabel("freq (1/d)")
     plt.ylabel("power")
     plt.show()
@@ -1043,14 +1276,15 @@ def dynamical_power_spec(time,flux,exptime,indeces,window_size,step_size):
         window_mask = (time >= current_start) & (time < current_start + window_size)
         t_seg = time[window_mask]
         f_seg = flux[window_mask]
-        print(len(t_seg))
         if len(t_seg) < 2:
             # Not enough data points
+            all_power_spectra.append(np.full(num_frequency_points, np.nan))
+            all_times.append(current_start + window_size/2)
             current_start += step_size
             continue
         
-        ls = LombScargle(time, flux)
-        power = ls.power(frequency)
+        ls = LombScargle(t_seg, f_seg)
+        power = ls.power(frequency,normalization = "model")
         # Store the computed power spectrum
         all_power_spectra.append(power)
         # Store the midpoint of the window (or start, depending on your choice)
@@ -1061,60 +1295,221 @@ def dynamical_power_spec(time,flux,exptime,indeces,window_size,step_size):
     
     power_matrix = np.array(all_power_spectra)  # shape ~ [number_of_windows, number_of_frequencies]
     
-    plt.figure(figsize=(8, 6))
-    # times on x-axis, frequency on y-axis
-    plt.imshow(
+    fig = plt.figure(figsize=(10, 6))
+    gs = GridSpec(nrows=2, ncols=2, 
+              width_ratios=[4, 1], 
+              height_ratios=[3, 1],
+              hspace=0.28, wspace=0.05)
+
+    # Top-left: Dynamic spectrum
+    ax_dyn = fig.add_subplot(gs[0, 0])
+    ax_dyn.locator_params(axis='x', nbins=10)
+    
+    # Top-right: Periodogram, share the frequency axis with ax_dyn
+    #   We'll arrange so that freq goes vertically.
+    ax_pgram = fig.add_subplot(gs[0, 1], sharey=ax_dyn)
+    
+    # Bottom-left: Light curve, share the time axis with ax_dyn
+    ax_lc = fig.add_subplot(gs[1, 0])
+    
+    
+    im = ax_dyn.imshow(
     power_matrix.T, 
     aspect='auto',
     origin='lower',
     extent=[all_times[0], all_times[-1], frequency[0], frequency[-1]],
     cmap='inferno',
     )  # adjust these as needed
+    
+    
+    
+    cbar = plt.colorbar(im, ax=ax_dyn, pad=0.01)
+    cbar.set_label("Power")
+    #ax_dyn.tick_params(labelbottom=False)
+    ax_dyn.set_ylabel("Frequuency (c/d)")   
+    ax_dyn.set_xlabel("Time (s)")              # separate time label
+    
+    ax_pgram.plot(power_1, frequency, color='k')
+    ax_pgram.set_xlabel("Power")    
 
-    plt.xlabel("Time (BJD - offset) [days]")
-    plt.ylabel("Frequency [1/day]")
-    plt.title("Dynamical Power Spectrum")
-    plt.colorbar(label="Power")
+    ax_pgram.tick_params(labelleft=False)
+    
+    print("time", len(time))
+    print("all_times", len(all_times))
+    ax_lc.plot(time, flux, color='b')
+    ax_lc.set_xlabel("Time (s)")    
+    ax_lc.set_ylabel("e/s)")
+    
     plt.show()
     
+    target_freq = 8.453
+    freq_idx = np.argmin(np.abs(frequency - target_freq))
+    power_slice = power_matrix[:, freq_idx]
+    
+    # Binning in 0.2-d windows:
+    bin_width = 0.2
+    t_min = np.min(all_times)
+    t_max = np.max(all_times)
+    bins = np.arange(t_min, t_max + bin_width, bin_width)
+    bin_means, bin_edges, _ = binned_statistic(all_times, power_slice,
+                                               statistic='mean', bins=bins)
+    bin_centers = 0.5 * (bin_edges[:-1] + bin_edges[1:])
+
+    # ------------------------------------------------------
+    # CREATE A MASK TO EXCLUDE THE SPIKES NEAR 2488 AND 2510
+    # ------------------------------------------------------
+    # For example, exclude times in (2487,2490) and (2508,2512)
+    peak_mask_1 = (bin_centers > 2484) & (bin_centers < 2490)
+    peak_mask_2 = (bin_centers > 2508) & (bin_centers < 2512.8)
+    peak_mask = peak_mask_1 | peak_mask_2
+    
+    # Keep only the “good” data points
+    masked_bin_centers = bin_centers[~peak_mask]
+    masked_bin_means   = bin_means[~peak_mask]
+    
+
+    target_freq1 = 8.9
+    freq_idx = np.argmin(np.abs(frequency - target_freq1))
+    
+    # 2) Extract the power at this frequency across all windows
+    power_slice = power_matrix[:, freq_idx]   # shape = (n_times,)
+    
+    # 3) Bin in 0.2-day windows
+    bin_width = 0.2
+    t_min = np.min(all_times)
+    t_max = np.max(all_times)
+    bins = np.arange(t_min, t_max + bin_width, bin_width)
+    
+    # Use binned_statistic to compute the mean power in each bin
+    bin_means, bin_edges, _ = binned_statistic(all_times, power_slice,
+                                               statistic='mean', bins=bins)
+    bin_centers = 0.5 * (bin_edges[:-1] + bin_edges[1:])
+    
+    # 4) Compute the average of these binned means
+    avg_power = np.mean(bin_means[~np.isnan(bin_means)])  # ignore any NaNs
+    threshold = 2.0 * avg_power
+    
+    print(f"Average power at {target_freq} c/d = {avg_power:.4f}")
+    print(f"Threshold (spin on/off) = {threshold:.4f}")
+    
+    off_mask = masked_bin_means < threshold
+    on_mask  = masked_bin_means >= threshold
+    
+    plt.rcParams.update({
+    "font.size": 20,          # Overall font size
+    "axes.labelsize": 20,      # Axis label font size
+    "xtick.labelsize": 20,     # X tick label font size
+    "ytick.labelsize": 20,     # Y tick label font size
+    "legend.fontsize": 20      # Legend font size
+    })
+    
+    # Plot the masked data
+    plt.figure(figsize=(7,4))
+    plt.scatter(
+    masked_bin_centers[off_mask],
+    masked_bin_means[off_mask],
+    color='red',
+    s=10,
+    label='Off state'
+    )
+
+    # Plot "on" points in another color
+    plt.scatter(
+        masked_bin_centers[on_mask],
+        masked_bin_means[on_mask],
+        color='green',
+        s=10,
+        label='On state'
+        )
+
+    #plt.scatter(masked_bin_centers, masked_bin_means, s=4, label='Masked data')
+    plt.xlabel('Time (days)')
+    plt.ylabel(f'Power at {target_freq:.3f} c/d')
+    #plt.locator_params(axis='x', nbins=12)
+    #plt.title('Binned Power in 0.2-day Windows')
+    
+    
+    plt.axhline(threshold,color = "black",linestyle = '--')
+    #plt.legend()
+    
+    
+    plt.show()
+    ls = LombScargle(masked_bin_centers, masked_bin_means)
+
+    # You can choose frequency limits, or let autopower handle it.
+    # E.g., from near zero up to a Nyquist-like limit:
+    frequency, power = ls.autopower(method='fast',samples_per_peak=10,maximum_frequency=0.8)  # arbitrary upper limit
+
+    # 3) Plot the Lomb-Scargle periodogram
+    plt.figure(figsize=(6,3))
+    plt.axvline(0.27, color='red', linestyle='--', label=r'$TESS: \omega-\Omega$')
+    #plt.axvline(0.135, color='blue', linestyle='--', label='freq = 0.89 c/d')
+    plt.plot(frequency, power, 'k-')
+    plt.xlabel('Frequency (c/d)')
+    plt.ylabel('Power')
+    plt.tight_layout()
+    #plt.legend()
+    plt.show()
+    
+def dynamical_2(time_all,flux_all,exptime,window_size,step_size):
+    chunkA_start, chunkA_end = 2475, 2524  # or refine these as needed
+    chunkB_start, chunkB_end = 3209, 3259
+    
+    # Create masks
+    maskA = (time_all >= chunkA_start) & (time_all <= chunkA_end)
+    maskB = (time_all >= chunkB_start) & (time_all <= chunkB_end)
+    
+    # Extract chunk A data
+    timeA = time_all[maskA]
+    fluxA = flux_all[maskA]
+    
+    
+    # Extract chunk B data
+    timeB = time_all[maskB]
+    fluxB = flux_all[maskB]
+    dynamical_power_spec(timeA,fluxA,exptime,indeces,window_size,step_size)
+    dynamical_power_spec(timeB,fluxB,exptime,indeces,window_size,step_size)
+        
 
 indexes = [0,1]
 indeces = [0,1,2,3]
 
 flux_stitched, time_stitched, exptime_stitched = stitch_flatten(indeces)
-#Lomb_Scargle(time_stitched, flux_stitched, exptime_stitched)
-dynamical_power_spec(time_stitched,flux_stitched,exptime_stitched,indeces,3,5)
+#stitched_final_plot(indeces)
 
+#Lomb_Scargle(time_stitched, flux_stitched, exptime_stitched)
+#dynamical_power_spec(time_stitched,flux_stitched,exptime_stitched,indeces,5,0.2)
+#dynamical_2(time_stitched,flux_stitched,exptime_stitched,2,1)
 #XMM_test()
 #flux,time = XMM_time_series()
 #ZTF_data()
 
-#time,flux,exptime, flux_error = Kepler_data(indexes[0])
+#time,flux,exptime, flux_error = Kepler_data(5)
 #Lomb_Scargle(time,flux,exptime)
 
 
-#time,flux,exptime,flux_error = sector_data(indeces[2])
+time,flux,exptime,flux_error = sector_data(indeces[1])
 #multiple_LC_plot(indexes)
 #times, fluxes, orbitals, spins, news = mulitple_sector_LS(indexes)
-#peak_frequencies = np.array([8.18])
-#phase_fold_binned(time, flux, peak_frequencies)
+peak_frequencies = np.array([8.181])
+phase_fold_binned(time, flux, peak_frequencies)
 
 
-time,flux,exptime,flux_error = sector_data(indeces[2])
+#time,flux,exptime,flux_error = sector_data(0)
 #bootstrap_lomb_scargle(time, flux)
 #bootstrap_errors(time, flux, exptime)
 #bootstrap_errors_multiple(indeces)
 #Lomb_Scargle(time, flux, exptime)
-#Lomb_Scargle_Annotated(time, flux, exptime)
-
+#Lomb_Scargle_Annotated(time_stitched, flux_stitched, exptime_stitched)
+#Lomb_Scargle_DualAnnotated(time_stitched, flux_stitched, exptime_stitched)
 #frequency,power,peak_frequencies,peak_powers = Lomb_Scargle(time,flux,exptime)
 #peak_classification(frequency,power,peak_frequencies,peak_powers)
 window_size = 0.3  # Window size in the same units as time (e.g., days or minutes)
 step_size = 5  # Step size for sliding the window
-min_freq = 0  # Minimum frequency (cycles/day)
-max_freq = 40  # Maximum frequency (cycles/day)
+min_freq = 0.5 # Minimum frequency (cycles/day)
+max_freq = 20 # Maximum frequency (cycles/day)
 
 # Call the function with your time, flux, and exptime data
-Lomb_Scargle_2D(time, flux, exptime, window_size, step_size, min_freq, max_freq)
+#Lomb_Scargle_2D(time, flux, exptime, window_size, step_size, min_freq, max_freq)
 #model_fit(time,flux,flux_error)
 #MCMC_Fit(time,flux,flux_error)
