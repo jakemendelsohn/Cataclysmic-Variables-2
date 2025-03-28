@@ -233,18 +233,16 @@ def ASAS_SN_delt():
 
 def LC_model(name):
     time,flux,exptime,flux_error = ASAS_SN_19bh(1,name)
-    time_mask = (time >= 2347) & (time <= 2357)
+    time_mask = (time >= 2330) & (time <= 2357)
     time = time[time_mask]
     flux = flux[time_mask]
     
     factor = (3.5*10**(34))/np.max(flux)
     flux = flux*factor
     
-    
-    
     delta_sorted, cdf = ASAS_SN_delt()
     
-    plt.scatter(time,flux,s=1,color = "black", label = "Original Data")
+    #plt.scatter(time,flux,s=1,color = "black", label = "Original Data")
     
     time_array = np.empty(0)
     flux_array = np.empty(0)
@@ -252,6 +250,18 @@ def LC_model(name):
     flux_current = flux[0]
     time_array = np.append(time_array,time_current)
     flux_array = np.append(flux_array,flux_current)
+    
+
+    # Modified code (random offset, e.g. ±2 days around the original start):
+    time_current = 2340
+    offset = np.random.uniform(-3, 3)  # adjust ±2 to whatever small range you need
+    time_current = time_array[0] + offset
+
+    # Optional: ensure it doesn't go outside the data range
+    #time_current = max(time_current, time_array.min())
+    #time_current = min(time_current, time_array.max())
+    
+    
     while time_current < time[-1]:
         random_num = random.uniform(0, 1)
         delta_sample = np.interp(random_num, cdf, delta_sorted)
@@ -261,24 +271,33 @@ def LC_model(name):
         sim_flux = flux[idx]
         flux_array = np.append(flux_array,sim_flux)
     
-    plt.scatter(time_array,flux_array,color = "red", s=5,label = "Simulated Points")
-    plt.xlabel("Time (BJD-2475000)")
-    plt.ylabel("Luminosity (erg/s)")
-    plt.legend()
-    plt.show()
+    #plt.scatter(time_array,flux_array,color = "red", s=5,label = "Simulated Points")
+    #plt.xlabel("Time (BJD-2475000)")
+    #plt.ylabel("Luminosity (erg/s)")
+    ##plt.legend()
+    #plt.show()
     peak_lumi = np.max(flux_array)
     
     
-    avg_flux_TESS = np.mean(flux)
-    print("average",avg_flux_TESS)
-    threshold = 1.1*avg_flux_TESS
+    #avg_flux_TESS = np.mean(flux)
+    #print("average",avg_flux_TESS)
+    #threshold = 1.1*avg_flux_TESS
+    
+    avg_flux_AS = np.mean(flux_array)
+    std_AS = np.std(flux_array)
+    threshold = avg_flux_AS+3*std_AS
+    print("TH",threshold)
     above_threshold = np.where(flux_array > threshold)[0]
     if len(above_threshold) == 0:
         print("No points above threshold — no outburst detected.")
         peak_lumi, integral_low,integral_up,outburst_duration,duration_lower = 0,0,0,0,0
     else:
         t_start = time_array[above_threshold[0]-1]
-        t_end = time_array[above_threshold[-1]+1]
+        if above_threshold[-1] + 1 < len(time_array):
+            t_end = time_array[above_threshold[-1]+1]
+        else:
+            t_end = time_array[above_threshold[-1]]
+        #t_end = time_array[above_threshold[-1]+1]
         outburst_duration = t_end - t_start
         print("Duration Upper Limit", outburst_duration)
         
@@ -295,8 +314,8 @@ def LC_model(name):
         end = np.where(time_array == t_end)[0]
         start = start[0]
         end = end[0]
-        t_burst  = time_array[start:end]
-        lum_burst = flux_array[start:end]
+        t_burst  = time_array[start:end+1]
+        lum_burst = flux_array[start:end+1]
         spd = 86400.0
         time_burst = t_burst * spd
         extracted_set = set(lum_burst)
@@ -310,8 +329,8 @@ def LC_model(name):
         end_lower = np.where(time_array == t_end_lower)[0]
         start_lower = start_lower[0]
         end_lower = end_lower[0]
-        t_burst = time_array[start_lower:end_lower]
-        lum_burst = flux_array[start_lower:end_lower]
+        t_burst = time_array[start_lower:end_lower+1]
+        lum_burst = flux_array[start_lower:end_lower+1]
         spd = 86400.0
         time_burst = t_burst * spd
         
@@ -337,6 +356,7 @@ def simulation(iterations,name):
         
     avg_int_per_run = 0.5 * (int_up_array + int_low_array)
     avg_dur_per_run = 0.5 * (dur_up_array + dur_low_array)
+    
 
     # (B) Or if you just want the **overall** average across all runs:
     mean_int_overall = np.mean(avg_int_per_run)  # average across all iterations
@@ -346,13 +366,19 @@ def simulation(iterations,name):
     #plt.xlabel("Average Eenergy (ergs)")
     #plt.ylabel("Peak Luminosity (erg/s)")
     
-    return avg_int_per_run,lum_array, int_low_array
+    return avg_int_per_run,lum_array, int_low_array,avg_dur_per_run
     
 def simulation_comparison(iterations,name):
     names_micro1, peak_micro1, peak_error_micro1, total_en_micro1, total_en_error_micro1, duration_micro1, duration_error_micro1,names_donor1, peak_donor1, peak_error_donor1, total_en_donor1, total_en_error_donor1, duration_donor1, duration_error_donor1,names_gating1, peak_gating1, peak_error_gating1, total_en_gating1, total_en_error_gating1, duration_gating1, duration_error_gating1, names_dwarf1,peak_dwarf1,peak_error_dwarf1, total_en_dwarf1,total_en_error_dwarf1,duration_dwarf1,duration_error_dwarf1 = literature_data()
     names_micro, peak_micro, peak_error_micro, total_en_micro_up, total_en_micro_low, duration_micro_up, duration_micro_low,P_orb_micro, P_spin_micro,names_donor, peak_donor, peak_error_donor, total_en_donor, total_en_error_donor, duration_donor, duration_error_donor,names_gating, peak_gating, peak_error_gating, total_en_gating, total_en_error_gating, duration_gating, duration_error_gating, P_orb_gating,P_spin_gating,names_dwarf,peak_dwarf,peak_error_dwarf, total_en_dwarf_up,total_en_dwarf_low,duration_dwarf_up,duration_dwarf_low,P_orb_dwarf,P_spin_dwarf,names_micro_iron, peak_micro_iron, peak_error_micro_iron, total_en_micro_iron_up, total_en_micro_iron_low, duration_micro_iron_up, duration_micro_iron_low, P_orb_micro_iron, P_spin_micro_iron,names_dwarf_iron,peak_dwarf_iron,peak_error_dwarf_iron, total_en_dwarf_iron_up,total_en_dwarf_iron_low,duration_dwarf_iron_up,duration_dwarf_iron_low, P_orb_dwarf_iron, P_spin_dwarf_iron = new_data()
     
-    energy, lum_array, low_energies = simulation(iterations,name)
+    energy, lum_array, low_energies,duration = simulation(iterations,name)
+    mask = energy >= 1e37
+
+    # Apply the mask to both arrays so they stay in sync
+    energy = energy[mask]
+    lum_array =lum_array[mask]
+    duration = duration[mask]
     
     midpoint_en_micro = (total_en_micro_up+total_en_micro_low)/2
     xerr_lower_micro = midpoint_en_micro - total_en_micro_low
@@ -382,9 +408,9 @@ def simulation_comparison(iterations,name):
     central_x = 1.2*10**(39)
     central_y = 3.5*10**(34)
     
-    (m1x, m1y), dir1, scale1 = principal_direction(energy, lum_array)
-    dx1 = dir1[0] * scale1
-    dy1 = dir1[1] * scale1
+    #(m1x, m1y), dir1, scale1 = principal_direction(energy, lum_array)
+    #dx1 = dir1[0] * scale1
+    #dy1 = dir1[1] * scale1
     #plt.arrow(m1x, m1y, dx1, dy1,
     #color='red', width=0,  # or a small number if you want thickness
     #head_width=0.07*m1y, length_includes_head=True,
@@ -401,12 +427,12 @@ def simulation_comparison(iterations,name):
     plt.yscale("log")
     plt.xlabel("Total Optical Energy (erg)")
     plt.ylabel("Peak Optical Luminosity (erg/s)")
-    plt.legend()
+   # plt.legend()
     plt.show()
     
     
-    plt.errorbar(midpoint_en_micro_iron, peak_micro_iron,xerr = [xerr_lower_micro_iron, xerr_upper_micro_iron],yerr = peak_error_micro_iron,fmt = '^', markersize = 6, elinewidth = 0.5,color = 'blue', label = 'Micronova (new)')
-    plt.errorbar(midpoint_en_dwarf_iron, peak_dwarf_iron,xerr = [xerr_lower_dwarf_iron, xerr_upper_dwarf_iron],yerr = peak_error_dwarf_iron,fmt = '^', markersize = 6, elinewidth = 0.5,color = 'red', label = "Dwarf nova (new)")
+    plt.errorbar(midpoint_en_micro_iron, peak_micro_iron,xerr = [xerr_lower_micro_iron, xerr_upper_micro_iron],yerr = peak_error_micro_iron,fmt = '^', markersize = 6, elinewidth = 0.5,color = 'grey', label = 'Micronova (new)')
+    plt.errorbar(midpoint_en_dwarf_iron, peak_dwarf_iron,xerr = [xerr_lower_dwarf_iron, xerr_upper_dwarf_iron],yerr = peak_error_dwarf_iron,fmt = '^', markersize = 6, elinewidth = 0.5,color = 'grey', label = "Dwarf nova (new)")
     
     plt.errorbar(total_en_micro1,peak_micro1,xerr = total_en_error_micro1, yerr= peak_error_micro1,label = "Micronovae",color = "blue",markersize=6, fmt = 'o',elinewidth=0.5, fillstyle = 'none')
     plt.errorbar(total_en_dwarf1, peak_dwarf1,xerr=total_en_error_dwarf1, yerr=peak_error_dwarf1,label="Dwarf Novae", color="red", markersize=6, fmt='o',elinewidth=0.5, fillstyle = 'none')
@@ -425,7 +451,51 @@ def simulation_comparison(iterations,name):
     plt.ylabel("Peak Optical Luminosity (erg/s)")
     plt.xscale('log')
     plt.yscale('log')
-    plt.legend()
+    #plt.legend()
+    plt.show()
+    plt.rcParams.update({
+    "font.size": 16,           # Overall font size
+    "axes.labelsize": 16,      # Axis label font size
+    "xtick.labelsize": 16,     # X tick label font size
+    "ytick.labelsize": 16,     # Y tick label font size
+    "legend.fontsize": 16     # Legend font size
+    })
+    
+    # Create a figure with 2 subplots side by side
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+
+    # --- Left subplot (ax1) ---
+    ax1.scatter(energy,lum_array, color = "orange", alpha = 0.3, label = "Simulations")
+    ax1.scatter(central_x,central_y,color = "red",marker = "x", label = "ASAS-SN 19bh")
+    ax1.set_xscale("log")
+    ax1.set_yscale("log")
+    #ax1.legend()
+    
+    # --- Right subplot (ax2) ---
+    ax2.errorbar(midpoint_en_micro_iron, peak_micro_iron,xerr = [xerr_lower_micro_iron, xerr_upper_micro_iron],yerr = peak_error_micro_iron,fmt = '^', markersize = 6, elinewidth = 0.5,color = 'grey', label = 'Micronova (new)')
+    ax2.errorbar(midpoint_en_dwarf_iron, peak_dwarf_iron,xerr = [xerr_lower_dwarf_iron, xerr_upper_dwarf_iron],yerr = peak_error_dwarf_iron,fmt = '^', markersize = 6, elinewidth = 0.5,color = 'grey', label = "Dwarf nova (new)")
+    
+    ax2.errorbar(total_en_micro1,peak_micro1,xerr = total_en_error_micro1, yerr= peak_error_micro1,label = "Micronovae",color = "blue",markersize=6, fmt = 'o',elinewidth=0.5, fillstyle = 'none')
+    ax2.errorbar(total_en_dwarf1, peak_dwarf1,xerr=total_en_error_dwarf1, yerr=peak_error_dwarf1,label="Dwarf Novae", color="red", markersize=6, fmt='o',elinewidth=0.5, fillstyle = 'none')
+    ax2.errorbar(total_en_gating1, peak_gating1,xerr=total_en_error_gating1, yerr=peak_error_gating1,label="Magnetic Gating", color="#bfa600", markersize=6, fmt='o',elinewidth=0.5, fillstyle = 'none')
+    ax2.scatter(energy,lum_array, color = "orange", alpha = 0.3, label = "Simulations")
+    ax2.scatter(central_x,central_y,color = "red",marker = "x", label = "ASAS-SN 19bh")
+    ax2.set_xscale("log")
+    ax2.set_yscale("log")
+    #ax2.set_title("Plot 2")
+    #ax2.legend()
+    # Remove individual x- and y-labels (so we can place them at figure level)
+    ax1.set_xlabel("")
+    ax1.set_ylabel("")
+    ax2.set_xlabel("")
+    ax2.set_ylabel("")
+    
+    plt.tight_layout(rect=[0.05, 0.05, 0.95, 0.95])
+
+    # Then place the figure-level labels
+    fig.supxlabel("Total Energy (erg)")
+    fig.supylabel("Peak Luminosity (erg/s)")
+
     plt.show()
     
     
@@ -433,7 +503,8 @@ def simulation_comparison(iterations,name):
     plt.errorbar(midpoint_en_dwarf_iron, midpoint_dur_dwarf_iron,xerr = [xerr_lower_dwarf_iron, xerr_upper_dwarf_iron],yerr = [xerr_lower_dwarf_dur,xerr_upper_dwarf_dur],fmt = 'o', markersize = 6, elinewidth = 0.5,color = 'grey')
     plt.xscale("log")
     plt.show()
-    return m1x, m1y, dir1, scale1
+    
+    return nonzero_energy
     
 def principal_direction(x, y):
     X = np.column_stack((x, y))
@@ -457,4 +528,12 @@ def principal_direction(x, y):
 #LC_model()
 #ASAS_SN_delt()
 #simulation(100)
-simulation_comparison(200, 'ASASSN -19bh')
+num_detected = np.zeros(50)
+for i in range(0,9):
+    non_zero = simulation_comparison(200, 'ASASSN -19bh')
+    num_detected[i] = non_zero
+
+avg_detected = np.mean(num_detected)
+error = np.std(num_detected) / np.sqrt(9)
+
+print("ASAS-SN detects", avg_detected,"+-", error, "bursts in 100 runs.")
